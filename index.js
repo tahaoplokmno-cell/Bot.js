@@ -5,6 +5,8 @@ const menus = require('./menus');
 const admin = require('./admin');
 const custom = require('./custom_items');
 const actions = require('./actions');
+const router = require('./router');
+const callbacks = require('./callbacks'); // استدعاء الملف الجديد
 
 const bot = new Telegraf(config.BOT_TOKEN);
 const DB_FILE = './database.json';
@@ -18,7 +20,7 @@ let userStates = {};
 bot.use((ctx, next) => {
     const uId = String(ctx.from?.id); if (!uId) return next();
     if (db.banned[uId]) return ctx.reply("🚫 نعتذر منك، أنت محظور نهائياً من هذا البوت.");
-    if (db.muted[uId] && ctx.message) return ctx.reply("🔇 حسابك مكتوم ومقيد من إرسال الرسائل حالياً.");
+    if (db.muted[uId] && ctx.message) return ctx.reply("🔇 حسابك مكتوم ومقيد حالياً.");
     return next();
 });
 
@@ -48,51 +50,45 @@ bot.hears('⚙️ الإعدادات', ctx => ctx.reply(`⚙️ الاسم: ${ct
 bot.hears('📞 الدعم الفني', ctx => ctx.reply(`📞 للتواصل المباشر مع الدعم الفني: ${config.DEVELOPER_USERNAME}`));
 
 bot.on(['text', 'photo'], async (ctx) => {
-    const uId = String(ctx.chat.id); let state = userStates[uId]; if (!state) return;
-    const rate = db.exchange_rate || 15000;
-
-    if (state.action === 'await_password') {
-        if (ctx.message.text === config.ADMIN_PASSWORD) { userStates[uId] = { action: 'admin_dashboard' }; return ctx.reply("✅ تم التحقق بنجاح! اكتب الآن أمر /panel لفتح لوحة التحكم."); }
-        userStates[uId] = null; return ctx.reply("❌ كلمة السر خاطئة!");
+    let state = userStates[String(ctx.chat.id)]; const rate = db.exchange_rate || 15000;
+    if (state && (state.action === 'await_proof' || state.action === 'await_game_id' || state.action === 'await_bot_desc')) {
+        if (state.action === 'await_proof') {
+            ctx.reply("✅ تم إرسال طلب الشحن وإثباتك للإدارة بنجاح. انتظر التفعيل!");
+            let cap = `🏦 **طلب إيداع شحن رصيد جديد:**\n🆔 آيدي العميل: \`${ctx.chat.id}\`\n💰 المبلغ: ${state.amountStr}\n💵 بالدولار: $${state.usdValue}`;
+            let adminButtons = Markup.inlineKeyboard([[Markup.button.callback("✅ قبول الشحن", `pay_approve#${ctx.chat.id}#${state.usdValue}`)], [Markup.button.callback("❌ رفض وإلغاء", `pay_reject#${ctx.chat.id}`)]]);
+            if (ctx.message.photo) { await ctx.telegram.sendPhoto(config.ADMIN_CHANNEL_ID, ctx.message.photo.pop().file_id, { caption: cap, reply_markup: adminButtons.reply_markup }); }
+            else { await ctx.telegram.sendMessage(config.ADMIN_CHANNEL_ID, cap + `\n📝 النص: ${ctx.message.text}`, { reply_markup: adminButtons.reply_markup }); }
+            userStates[String(ctx.chat.id)] = null; return;
+        }
+        if (state.action === 'await_game_id' && ctx.message.text) {
+            userStates[String(ctx.chat.id)] = { ...state, action: 'confirmed', gameId: ctx.message.text };
+            let gMsg = `🎯 **مراجعة وتأكيد طلب الشحن:**\n\n🆔 آيدي حسابك في اللعبة: \`${ctx.message.text}\`\n🎁 المنتج المطلوب: *${state.item}*\n\n⚠️ **طريقة الاسترداد الفوري بعد استلام الكود:**\n1️⃣ يجب عليك الدخول للموقع الرسمي الشهير لاسترداد الأكواد: [midasbuy.com](https://midasbuy.com)\n2️⃣ اختر اللعبة التي شحنتها ثم ضع آيدي حسابك والكود المستلم.\n3️⃣ **ملاحظة هامة:** يجب تفعيل الـ VPN إذا كنت متواجداً داخل سوريا لكي يفتح الموقع المعتمد بنجاح!`;
+            return ctx.reply(gMsg, { parse_mode: 'Markdown', disable_web_page_preview: true, ...Markup.inlineKeyboard([[Markup.button.callback("🚀 تأكيد وإرسال الطلب", "confirm_order")]]) });
+        }
+        if (state.action === 'await_bot_desc' && ctx.message.text) { await ctx.telegram.sendMessage(config.ADMIN_CHANNEL_ID, `🤖 **طلب تصميم بوت جديد:**\n👤 العميل: ${ctx.from.first_name}\n📝 المواصفات:\n${ctx.message.text}`); ctx.reply("🚀 تم إرسال مواصفات البوت للمطور بنجاح."); userStates[String(ctx.chat.id)] = null; return; }
     }
-    if (state.action === 'adm_await_rate' && ctx.message.text) { db.exchange_rate = parseInt(ctx.message.text); saveDB(); userStates[uId] = { action: 'admin_dashboard' }; return ctx.reply("✅ تم التحديث! اكتب /panel"); }
-    if (state.action === 'adm_await_ban' && ctx.message.text) { db.banned[ctx.message.text] = true; saveDB(); return ctx.reply("✅ تم حظره نهائياً."); }
-    if (state.action === 'adm_await_unban' && ctx.message.text) { delete db.banned[ctx.message.text]; saveDB(); return ctx.reply("🔓 تم فك الحظر."); }
-    if (state.action === 'adm_await_mute' && ctx.message.text) { db.muted[ctx.message.text] = true; saveDB(); return ctx.reply("🔇 تم كتمه."); }
-    if (state.action === 'adm_await_unmute' && ctx.message.text) { delete db.muted[ctx.message.text]; saveDB(); return ctx.reply("🔊 تم فك الكتم."); }
-    if (state.action === 'adm_await_broadcast' && ctx.message.text) { Object.keys(db.users || {}).forEach(id => { ctx.telegram.sendMessage(id, `📢 **إعلان من الإدارة:**\n\n${ctx.message.text}`).catch(()=>{}); }); return ctx.reply("✅ جاري بث الرسالة..."); }
-    if (state.action === 'adm_await_user_check' && ctx.message.text) { let target = db.users[ctx.message.text]; if (!target) return ctx.reply("❌ غير مسجل."); return ctx.reply(`👤 الاسم: ${target.name}\n💵 رصيده: $${(target.balance_usd || 0).toFixed(2)}`); }
-    if (state.action === 'admin_send_code_now' && ctx.message.text) { await ctx.telegram.sendMessage(state.clientUId, `🎉 **تم قبول طلبك وتسليمه بنجاح**\n🎯 المنتج: ${state.item}\n🔑 **الكود الخاص بك هو:**\n\`${ctx.message.text}\``); ctx.reply("✅ تم إرسال الكود للعميل بنجاح."); userStates[uId] = { action: 'admin_dashboard' }; return; }
-    if (state.action === 'adm_await_gift' && ctx.message.text) { let parts = ctx.message.text.split('#'); if (parts.length < 2) return ctx.reply("❌ أرسل: الآيدي#المبلغ"); let tId = parts[0].trim(), amt = parseFloat(parts[1].trim()); if (!db.users[tId]) return ctx.reply("❌ غير موجود."); db.users[tId].balance_usd = (db.users[tId].balance_usd || 0) + amt; saveDB(); ctx.telegram.sendMessage(tId, `🎉 تم إيداع $${amt} في محفظتك.`); userStates[uId] = { action: 'admin_dashboard' }; return ctx.reply("✅ تم شحن حساب العميل بنجاح."); }
-    if (state.action === 'await_proof') {
-        ctx.reply("✅ تم إرسال طلب الشحن وإثباتك للإدارة بنجاح. انتظر التفعيل!");
-        let cap = `🏦 **طلب إيداع شحن رصيد جديد:**\n🆔 آيدي العميل: \`${uId}\`\n👤 الاسم: ${ctx.from.first_name}\n💰 المبلغ المطلوب: ${state.amountStr}\n💵 بالدولار التقريبي: $${state.usdValue}`;
-        let adminButtons = Markup.inlineKeyboard([[Markup.button.callback("✅ قبول الشحن وإيداع الفلوس", `pay_approve#${uId}#${state.usdValue}`)], [Markup.button.callback("❌ رفض وإلغاء الطلب", `pay_reject#${uId}`)]]);
-        if (ctx.message.photo) { await ctx.telegram.sendPhoto(config.ADMIN_CHANNEL_ID, ctx.message.photo.pop().file_id, { caption: cap, reply_markup: adminButtons.reply_markup }); } else { await ctx.telegram.sendMessage(config.ADMIN_CHANNEL_ID, cap + `\n📝 النص: ${ctx.message.text}`, { reply_markup: adminButtons.reply_markup }); } userStates[uId] = null;
-    }
-    if (state.action === 'await_game_id' && ctx.message.text) {
-        userStates[uId] = { ...state, action: 'confirmed', gameId: ctx.message.text };
-        let gMsg = `🎯 **مراجعة وتأكيد طلب الشحن:**\n\n🆔 آيدي حسابك في اللعبة: \`${ctx.message.text}\`\n🎁 المنتج المطلوب: *${state.item}*\n\n⚠️ **طريقة الاسترداد الفوري بعد استلام الكود:**\n1️⃣ يجب عليك الدخول للموقع الرسمي الشهير لاسترداد الأكواد: [midasbuy.com](https://midasbuy.com)\n2️⃣ اختر اللعبة التي شحنتها ثم ضع آيدي حسابك والكود المستلم.\n3️⃣ **ملاحظة هامة:** يجب تفعيل الـ VPN إذا كنت متواجداً داخل سوريا لكي يفتح الموقع المعتمد بنجاح!`;
-        return ctx.reply(gMsg, { parse_mode: 'Markdown', disable_web_page_preview: true, ...Markup.inlineKeyboard([[Markup.button.callback("🚀 تأكيد وإرسال الطلب", "confirm_order")]]) });
-    }
-    if (state.action === 'await_bot_desc' && ctx.message.text) { await ctx.telegram.sendMessage(config.ADMIN_CHANNEL_ID, `🤖 **طلب تصميم بوت جديد:**\n👤 العميل: ${ctx.from.first_name}\n📝 المواصفات:\n${ctx.message.text}`); ctx.reply("🚀 تم إرسال مواصفات البوت للمطور بنجاح."); userStates[uId] = null; }
-    if (state.action === 'adm_await_add' || state.action === 'adm_await_del' || state.action === 'adm_await_disc' || state.action === 'adm_await_txt') { userStates[uId] = { action: 'admin_dashboard' }; return ctx.reply("☠️ تم تسجيل التعديل المباشر بنجاح داخل الذاكرة الحية! اكتب /panel"); }
+    await router.handleMessages(ctx, userStates, db, saveDB);
 });
 
 bot.on('callback_query', async (ctx) => {
     const data = ctx.callbackQuery.data; const uId = String(ctx.from.id); await ctx.answerCbQuery().catch(()=>{}); const rate = db.exchange_rate || 15000;
+    const handledStore = await callbacks.handleStoreDecisions(ctx, bot, db, userStates, saveDB, uId); if (handledStore) return;
     const handled = await actions.handleCallbacks(ctx, bot, db, userStates, saveDB); if (handled) return;
 
-    if (data.startsWith("pay_approve#") || data.startsWith("pay_reject#")) {
-        let parts = data.split('#'); let cId = parts[1];
-        if (data.startsWith("pay_approve#")) {
-            let usdValue = parseFloat(parts[2]); if (!db.users[cId]) db.users[cId] = { balance_usd: 0 }; db.users[cId].balance_usd = (db.users[cId].balance_usd || 0) + usdValue; saveDB();
-            ctx.editMessageText(ctx.callbackQuery.message.text + `\n\n✅ [تمت الموافقة الآلية وشحن الحساب بمبلغ $${usdValue}]`).catch(()=>{}); return bot.telegram.sendMessage(cId, `🎉 **تم قبول وصل التحويل، وتم إيداع $${usdValue} في محفظتك بنجاح.**`);
-        } else { ctx.editMessageText(ctx.callbackQuery.message.text + `\n\n❌ [تم رفض وإلغاء هذا الوصل بنجاح]`).catch(()=>{}); return bot.telegram.sendMessage(cId, `❌ **نعتذر منك، تم رفض إثبات شحن الرصيد المرسل من قبلك لمخالفته البيانات.**`); }
+    if (data === "m#games" || data === "m#cards") { const isGame = data === "m#games"; const source = isGame ? custom.MY_CUSTOM_GAMES : custom.MY_CUSTOM_CARDS; let buttons = Object.keys(source).map(g => [Markup.button.callback((isGame ? "🎮 " : "🎟️ ") + g, (isGame ? "vg#" : "vc#") + g)]); return ctx.editMessageText(isGame ? "🎮 **اختر اللعبة المطلوبة لتصفح الفئات:**" : "🎟️ **اختر نوع البطاقات الرقمية المطلوبة:**", Markup.inlineKeyboard(buttons)); }
+    if (data === "bot_order#start") { userStates[uId] = { action: 'await_bot_desc' }; return ctx.reply("🤖 **قسم إنشاء وتصميم بوت خاص:**\n\nاكتب الآن نوع البوت والمواصفات التي تريد برمجتها بوضوح في رسالة واحدة ليراجعها المطور:"); }
+    if (data.startsWith("vg#") || data.startsWith("vc#")) { const isGame = data.startsWith("vg#"); const name = data.split('#')[1]; const list = isGame ? custom.MY_CUSTOM_GAMES[name] : custom.MY_CUSTOM_CARDS[name]; let buttons = list.map(item => { let price = parseFloat(item.split('-')[1]); return [Markup.button.callback(item, "buy#" + (isGame ? "game" : "card") + "#" + name + "#" + item + "#" + price)]; }); return ctx.editMessageText(`🎯 **العروض والأسعار المتوفرة لـ ${name}:**`, Markup.inlineKeyboard(buttons)); }
+    if (data.startsWith("buy#")) {
+        const parts = data.split('#'); let type = parts[1]; let name = parts[2]; let item = parts[3]; let price = parseFloat(parts[4]); userStates[uId] = { type, name, item, price };
+        if (type === "card") { userStates[uId].action = 'confirmed'; return ctx.reply(`🎯 **تأكيد شراء البطاقة:**\nالمنتج: ${item}\nالسعر: ${price}$\n━━━━━━━━━━━━━━━━━━━━\nاضغط على الزر بالأسفل لإتمام الطلب والخصم المالي:`, Markup.inlineKeyboard([[Markup.button.callback("🚀 تأكيد وشراء البطاقة فوراً", "confirm_order")]])); }
+        else { userStates[uId].action = 'await_game_id'; return ctx.reply(`✍️ يرجى كتابة رقم **الآيدي (ID)** الخاص بحسابك في لعبة ${name} بدقة للمتابعة:`); }
     }
-    if (data.startsWith("order_dec#")) {
-        let parts = data.split('#'); let dec = parts[1]; let cId = parts[2]; let itemPrice = parseFloat(parts[3]); let itemName = parts[4];
-        if (dec === "accept") {
-            let userBal = db.users[cId]?.balance_usd || 0; if (userBal < itemPrice) return ctx.reply("❌ رصيد محفظة العميل لا يكفي حالياً للخصم إطلاقاً!");
-            db.users[cId].balance_usd -= itemPrice; saveDB(); ctx.editMessageText(ctx.callbackQuery.message.text + `\n\n✅ [تم قبول الطلب وخصم $${itemPrice} من محفظته]\n✍️ اكتب الآن كود الشحن لإرساله للزبون:`).catch(()=>{}); userStates[uId] = { action: 'admin_send_code_now', clientUId: cId, item: itemName };
-
+    if (data === "confirm_order") {
+        const state = userStates[uId]; if (!state) return ctx.reply("❌ لا يوجد طلب نشط."); let userBal = db.users[uId]?.balance_usd || 0; if (userBal < state.price) return ctx.reply(`❌ رصيدك الحالي ($${userBal.toFixed(2)}) لا يكفي لشراء هذا المنتج! يرجى شحن محفظتك أولاً.`);
+        let adminMsg = `📥 **طلب شراء جديد قيد الانتظار:**\n\n👤 العميل: ${ctx.from.first_name}\n🆔 آيدي التليجرام: \`${uId}\`\n🏦 رصيد محفظة الزبون: $${userBal.toFixed(2)}\n🎯 الخدمة المطلوبة: *${state.item}*\n💵 سعر المنتج: *${state.price}$*\n🆔 آيدي اللاعب (إن وجد): \`${state.gameId || 'طلب بطاقة رقمية'}\``;
+        let adminButtons = Markup.inlineKeyboard([[Markup.button.callback("✅ قبول الطلب وتسليم الكود", `order_dec#accept#${uId}#${state.price}#${state.item}`)], [Markup.button.callback("❌ رفض وإلغاء الطلب بالكامل", `order_dec#reject#${uId}#${state.price}#${state.item}`)]]);
+        await ctx.telegram.sendMessage(config.ADMIN_CHANNEL_ID, adminMsg, { reply_markup: adminButtons.reply_markup, parse_mode: 'Markdown' }); ctx.reply("🚀 تم إرسال طلب الشراء الخاص بك بنجاح تامي إلى الإدارة للمراجعة. سيتم تسليم الكود لك هنا فور موافقة المسؤول!"); userStates[uId] = null;
+    }
+    if (data === "ch#usd" || data === "ch#syr") { return ctx.editMessageText(data === "ch#usd" ? "💵 اختر المبلغ الذي تريد شحنه بالدولار:" : "🇸🇾 اختر الفئة التي قمت بتحويلها بالليرة السورية:", data === "ch#usd" ? menus.chargeValuesMenu : menus.chargeSyrMenu); }
+    if (data.startsWith("amt#") || data.startsWith("amts#")) { let isUsd = data.startsWith("amt#"); let val = parseFloat(data.split('#')[1]); let usdVal = isUsd ? val : (val / rate); userStates[uId] = { action: 'await_proof', amountStr: isUsd ? `${val}$` : `${val.toLocaleString()} ل.س`, usdValue: usdVal.toFixed(2) }; return ctx.reply(`💳 **لقد اخترت شحن فئة (${userStates[uId].amountStr})**\n\nقم بالتحويل الآن لحساب الإدارة المعتمد، ثم أرسل (صورة الوصل أو رمز العملية النصي) هنا في الشات فوراً ليتم الشحن التلقائي فور التأكيد:`); }
+});
