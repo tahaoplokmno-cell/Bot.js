@@ -4,4 +4,3 @@ module.exports = {
     DEVELOPER_USERNAME: "@MrXT1_3",
     BOT_TOKEN: "8700905522:AAE30w5iFr8jmhIRf_eE0EpSAmk6j1lMfn8"
 };
-
