@@ -2,7 +2,7 @@ const { Telegraf, Markup } = require('telegraf'); const fs = require('fs');
 const config = require('./config'); const menus = require('./menus');
 const shop = require('./shop'); const charge = require('./charge');
 const devBot = require('./dev_bot'); const admin = require('./admin');
-const adminNotes = require('./admin_notes');
+const callbacks = require('./callbacks');
 
 const bot = new Telegraf(config.BOT_TOKEN); const DB_FILE = './database.json';
 let db = { users: {}, exchange_rate: 15000, banned: {} };
@@ -20,7 +20,7 @@ bot.start(async (ctx) => {
     const uId = String(ctx.chat.id); if (!db.users) db.users = {};
     if (!db.users[uId]) { db.users[uId] = { name: ctx.from.first_name, balance_usd: 0.0 }; saveDB(); }
     const rate = db.exchange_rate || 15000; const usd = db.users[uId].balance_usd || 0;
-    let welcome = `👑 **بوت شام إن جيم | SHAM IN GAME** 👑\n━━━━━━━━━━━━━━━━━━━━\n👤 **مرحباً بك يا:** ${ctx.from.first_name || "زبوننا الغالي"}\n\n💰 **رصيد محفظتك الحالي:**\n💵 بالدولار: *${usd.toFixed(2)}$*\n🇸🇾 بالليرة السورية: *${(usd * rate).toLocaleString()} ل.س*\n\n📈 **سعر الصرف المعتمد اليوم:**\n1$ = *${rate.toLocaleString()} ل.س*\n━━━━━━━━━━━━━━━━━━━━\n⚠️ **تنويه هـام للزبائن الكرام:**\nقد يستغرق معالجة وتسليم طلبك بعض الوقت، وخاصةً في أوقات الليل، وذلك لأنني الأدمن الوحيد الذي يقوم بمراجعة وشحن الحسابات يدوياً لضمان أمانكم. شكراً لتفهمكم وصبركم معنا! ❤️`;
+    let welcome = `👑 **بوت شام إن جيم | SHAM IN GAME** 👑\n━━━━━━━━━━━━━━━━━━━━\n👤 **مرحباً بك يا:** ${ctx.from.first_name || "زبوننا الغالي"}\n\n💰 **رصيد محفظتك الحالي:**\n💵 بالدولار: *${usd.toFixed(2)}$*\n🇸🇾 بالليرة السورية: *${(usd * rate).toLocaleString()} ل.س*\n\n📈 **سعر الصرف اليوم:** 1$ = *${rate.toLocaleString()} ل.س*\n━━━━━━━━━━━━━━━━━━━━\n⚠️ **تنويه هـام للزبائن الكرام:**\nقد يستغرق معالجة وتسليم طلبك بعض الوقت، وخاصةً في أوقات الليل، وذلك لأنني الأدمن الوحيد الذي يقوم بمراجعة وشحن الحسابات يدوياً لضمان أمانكم. شكراً لتفهمكم وصبركم معنا! ❤️`;
     await ctx.reply(welcome, { parse_mode: 'Markdown', ...menus.mainMenu });
 });
 
@@ -31,25 +31,27 @@ bot.hears('🤖 إنشاء بوت', ctx => devBot.initBotOrder(ctx, userStates, 
 bot.on(['text', 'photo'], async (ctx) => {
     const uId = String(ctx.chat.id); let state = userStates[uId]; if (!state) return;
     if (state.action === 'await_password' && ctx.message.text === config.ADMIN_PASSWORD) { userStates[uId] = { action: 'admin_dashboard' }; return ctx.reply("✅ تم التحقق! اكتب الآن الأمر /panel لفتح لوحة التحكم."); }
-    if (state.action === 'await_new_notes') return adminNotes.saveNewNotes(ctx, ctx.message.text, uId, userStates, db, admin.getAdminPanel);
+    if (state.action === 'await_new_notes') return admin.saveNotes(ctx, ctx.message.text, uId, userStates, db);
     if (state.action.startsWith('await_charge') || state.action === 'await_proof') return charge.handleChargeSteps(ctx, state, uId, userStates);
     if (state.action === 'await_bot_desc' && ctx.message.text) return devBot.askServer(ctx, ctx.message.text, uId, userStates);
+    if (state.action === 'admin_send_code_now' && ctx.message.text) { ctx.telegram.sendMessage(state.clientUId, `🎁 **وصلك كود الشحن الخاص بطلبك بنجاح:**\n\n\`${ctx.message.text}\`\n\n━━━━━━━━━━━━━━━━━━━━\n🚀 **طريقة استرداد الأكواد فوراً:**\n1️⃣ ادخل للموقع الرسمي المعتمد: [midasbuy.com](https://midasbuy.com)\n2️⃣ اختر اللعبة ثم ضع آيدي حسابك والكود المستلم لتفعيله.\n3️⃣ **تنبيه هام:** يجب تشغيل الـ VPN إذا كنت داخل سوريا ليفتح الموقع بنجاح!`); ctx.reply("✅ تم إرسال الكود للزبون بنجاح تامي وتغليق الطلب."); userStates[uId] = null; return; }
     if (state.action === 'await_game_id' && ctx.message.text) {
         userStates[uId] = { ...state, action: 'confirmed', gameId: ctx.message.text };
-        return ctx.reply(`🎯 **مراجعة وتأكيد طلب الشحن:**\n\n🆔 آيدي حسابك في اللعبة: \`${ctx.message.text}\`\n🎁 المنتج المطلوب: *${state.item}*`, { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback("🚀 تأكيد وإرسال الطلب للقناة", "confirm_order")]]) });
+        return ctx.reply(`🎯 **مراجعة وتأكيد طلب الشحن:**\n\n🆔 آيدي حسابك في اللعبة: \`${ctx.message.text}\`\n🎁 المنتج المطلوب: *${state.item}*\n💵 السعر: *${state.price}$*`, { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback("✔️ تأكيد ودفع فوراً", "confirm_order")]]) });
     }
 });
 bot.on('callback_query', async (ctx) => {
     const data = ctx.callbackQuery.data; const uId = String(ctx.from.id); await ctx.answerCbQuery().catch(()=>{});
-    if (data === "adm#edit_notes") return adminNotes.handleNotesCallback(ctx, userStates, uId);
-    if (data === "adm#close_panel") return ctx.deleteMessage().catch(()=>{});
+    if (await callbacks.handleStoreDecisions(ctx, bot, db, userStates, saveDB, uId)) return;
+    if (data.startsWith("adm#")) return admin.handleAdminCallback(ctx, data, uId, userStates);
+    if (data.startsWith("ch#")) return charge.askAmount(ctx, data, uId, userStates);
     if (data.startsWith("srv#")) return devBot.handleServerChoice(ctx, data, uId, userStates);
     if (data === "confirm_order") {
         const state = userStates[uId]; if (!state) return ctx.reply("❌ لا يوجد طلب نشط.");
         let chanBtn = Markup.inlineKeyboard([[Markup.button.callback("✅ قبول وتفعيل الكود", `order_dec#accept#${uId}#${state.price}`)], [Markup.button.callback("❌ رفض وإلغاء", `order_dec#reject#${uId}`)]]);
-        await ctx.telegram.sendMessage(config.ADMIN_CHANNEL_ID, `📥 **طلب شراء جديد في القناة:**\n━━━━━━━━━━━━━━━━━━━━\n👤 الزبون: ${ctx.from.first_name}\n🎯 المنتج المطلوب: *${state.item}*\n💵 السعر: *${state.price}$*\n🆔 الآيدي المرسل: \`${state.gameId || 'طلب بطاقة رقمية'}\``, { reply_markup: chanBtn.reply_markup, parse_mode: 'Markdown' });
-        ctx.reply("🚀 تم إرسال طلب الشراء الخاص بك بنجاح إلى الإدارة للمراجعة وقناتك الخاصة! سيتم إخطارك هنا فور الموافقة."); userStates[uId] = null; return;
+        await ctx.telegram.sendMessage(config.ADMIN_CHANNEL_ID, `📥 **طلب شراء جديد قيد الموافقة:**\n━━━━━━━━━━━━━━━━━━━━\n👤 الزبون: ${ctx.from.first_name}\n🎯 المنتج: *${state.item}*\n💵 السعر: *${state.price}$*\n🆔 الآيدي: \`${state.gameId}\``, { reply_markup: chanBtn.reply_markup, parse_mode: 'Markdown' });
+        ctx.reply("🚀 تم إرسال طلب الشراء الخاص بك بنجاح إلى الإدارة! انتظر موافقة المسؤول هنا ليظهر لك الكود."); userStates[uId] = null; return;
     }
     shop.handleStore(ctx, data, uId, db, userStates);
 });
-bot.launch().then(() => console.log("🚀 BOT IS RUNNING PERFECTLY WITHOUT ERROR!"));
+bot.launch().then(() => console.log("🚀 ALL SYSTEM FILES LOADED SAFELY!"));
