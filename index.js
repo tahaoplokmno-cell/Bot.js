@@ -1,11 +1,10 @@
-const { Telegraf, Markup } = require('telegraf');
+ Telegraf, Markup } = require('telegraf');
 const fs = require('fs');
 const config = require('./config');
 const menus = require('./menus');
 const admin = require('./admin');
 const custom = require('./custom_items');
 const actions = require('./actions');
-const callbacks = require('./callbacks');
 
 const bot = new Telegraf(config.BOT_TOKEN);
 const DB_FILE = './database.json';
@@ -36,7 +35,7 @@ bot.start(async (ctx) => {
     const uId = String(ctx.chat.id); if (!db.users) db.users = {};
     if (!db.users[uId]) { db.users[uId] = { name: ctx.from.first_name, balance_usd: 0.0 }; saveDB(); }
     const rate = db.exchange_rate || 15000; const usd = db.users[uId].balance_usd || 0;
-    let welcome = `👑 **بوت شام إن جيم | SHAM IN GAME** 👑\n━━━━━━━━━━━━━━━━━━━━\n👤 **مرحباً بك يا:** ${ctx.from.first_name || "زبوننا الغالي"}\n\n💰 **رصيد محفظتك الحالي:**\n💵 بالدولار: *${usd.toFixed(2)}$*\n🇸🇾 بالليرة السورية: *${(usd * rate).toLocaleString()} ل.س*\n\n📈 **سعر الصرف المعتمد اليوم:**\n1$ = *${rate.toLocaleString()} ل.س*\n━━━━━━━━━━━━━━━━━━━━\n⚠️ **تنويه هـام للزبائن الكرام:**\nقد يستغرق معالجة وتسليم طلبك بعض الوقت، وخاصةً في أوقات الليل، وذلك لأنني الأدمن الوحيد الذي يقوم بمراجعة وشحن الحسابات يدوياً لضمان أمانكم. شكراً لتفهمكم وصبركم معنا! ❤️`;
+    let welcome = `👑 **بوت شام إن جيم | SHAM IN GAME** 👑\n━━━━━━━━━━━━━━━━━━━━\n👤 **مرحباً بك يا:** ${ctx.from.first_name || "زبوننا الغالي"}\n\n💰 **رصيد محفظتك الحالي:**\n💵 بالدولار: *${usd.toFixed(2)}$*\n🇸🇾 بالليرة السورية: *${(usd * rate).toLocaleString()} ل.س*\n\n📈 **سعر الصرف المعتمد اليوم:**\n1$ = *${rate.toLocaleString()} ل.س*\n━━━━━━━━━━━━━━━━━━━━\n⚠️ **تنويه هـام للزبائن الكرام:**\nقد يستغرق معالجة وتسليم طلبك بعض الوقت، وخاصةً in أوقات الليل، وذلك لأنني الأدمن الوحيد الذي يقوم بمراجعة وشحن الحسابات يدوياً لضمان أمانكم. شكراً لتفهمكم وصبركم معنا! ❤️`;
     await ctx.reply(welcome, { parse_mode: 'Markdown', ...menus.mainMenu });
 });
 
@@ -70,25 +69,36 @@ bot.on(['text', 'photo'], async (ctx) => {
 
 bot.on('callback_query', async (ctx) => {
     const data = ctx.callbackQuery.data; const uId = String(ctx.from.id); await ctx.answerCbQuery().catch(()=>{}); const rate = db.exchange_rate || 15000;
-    const handledStore = await callbacks.handleStoreDecisions(ctx, bot, db, userStates, saveDB, uId); if (handledStore) return;
     const handled = await actions.handleCallbacks(ctx, bot, db, userStates, saveDB); if (handled) return;
 
+    if (data.startsWith("pay_approve#") || data.startsWith("pay_reject#")) {
+        let parts = data.split('#'); let cId = parts[1];
+        if (data.startsWith("pay_approve#")) {
+            let usdValue = parseFloat(parts[2]); if (!db.users[cId]) db.users[cId] = { balance_usd: 0 }; db.users[cId].balance_usd = (db.users[cId].balance_usd || 0) + usdValue; saveDB();
+            ctx.editMessageText(ctx.callbackQuery.message.text + `\n\n✅ [تمت الموافقة الآلية وشحن الحساب بمبلغ $${usdValue}]`).catch(()=>{}); return bot.telegram.sendMessage(cId, `🎉 **تم قبول وصل التحويل، وتم إيداع $${usdValue} في محفظتك بنجاح.**`);
+        } else { ctx.editMessageText(ctx.callbackQuery.message.text + `\n\n❌ [تم رفض وإلغاء هذا الوصل بنجاح]`).catch(()=>{}); return bot.telegram.sendMessage(cId, `❌ **نعتذر منك، تم رفض إثبات شحن الرصيد المرسل من قبلك لمخالفته البيانات.**`); }
+    }
+    if (data.startsWith("order_dec#")) {
+        let parts = data.split('#'); let dec = parts[1]; let cId = parts[2]; let itemPrice = parseFloat(parts[3]); let itemName = parts[4];
+        if (dec === "accept") {
+            let userBal = db.users[cId]?.balance_usd || 0; if (userBal < itemPrice) return ctx.reply("❌ رصيد محفظة العميل لا يكفي حالياً للخصم إطلاقاً!");
+            db.users[cId].balance_usd -= itemPrice; saveDB(); ctx.editMessageText(ctx.callbackQuery.message.text + `\n\n✅ [تم قبول الطلب وخصم $${itemPrice} من محفظته]\n✍️ اكتب الآن كود الشحن لإرساله للزبون:`).catch(()=>{}); userStates[uId] = { action: 'admin_send_code_now', clientUId: cId, item: itemName };
+        } else { ctx.editMessageText(ctx.callbackQuery.message.text + `\n\n❌ [تم رفض طلب الشراء بنجاح ولم يتم خصم شيء]`).catch(()=>{}); return bot.telegram.sendMessage(cId, `❌ **نعتذر منك غالي، تم إلغاء ورفض طلبك لشراء ${itemName} من قبل الإدارة.**`); }
+        return;
+    }
     if (data === "m#games" || data === "m#cards") { const isGame = data === "m#games"; const source = isGame ? custom.MY_CUSTOM_GAMES : custom.MY_CUSTOM_CARDS; let buttons = Object.keys(source).map(g => [Markup.button.callback((isGame ? "🎮 " : "🎟️ ") + g, (isGame ? "vg#" : "vc#") + g)]); return ctx.editMessageText(isGame ? "🎮 **اختر اللعبة المطلوبة لتصفح الفئات:**" : "🎟️ **اختر نوع البطاقات الرقمية المطلوبة:**", Markup.inlineKeyboard(buttons)); }
     if (data === "bot_order#start") { userStates[uId] = { action: 'await_bot_desc' }; return ctx.reply("🤖 **قسم إنشاء وتصميم بوت خاص:**\n\nاكتب الآن نوع البوت والمواصفات التي تريد برمجتها بوضوح في رسالة واحدة ليراجعها المطور:"); }
-    if (data.startsWith("vg#") || data.startsWith("vc#")) { const isGame = data.startsWith("vg#"); const name = data.split('#'); const list = isGame ? custom.MY_CUSTOM_GAMES[name] : custom.MY_CUSTOM_CARDS[name]; let buttons = list.map(item => { let price = parseFloat(item.split('-')); return [Markup.button.callback(item, "buy#" + (isGame ? "game" : "card") + "#" + name + "#" + item + "#" + price)]; }); return ctx.editMessageText(`🎯 **العروض والأسعار المتوفرة لـ ${name}:**`, Markup.inlineKeyboard(buttons)); }
+    
+    if (data.startsWith("vg#") || data.startsWith("vc#")) { 
+        const isGame = data.startsWith("vg#"); const name = data.split('#')[1]; 
+        const list = isGame ? custom.MY_CUSTOM_GAMES[name] : custom.MY_CUSTOM_CARDS[name]; 
+        let buttons = list.map(item => { let price = parseFloat(item.split('-')[1]); return [Markup.button.callback(item, "buy#" + (isGame ? "game" : "card") + "#" + name + "#" + item + "#" + price)]; }); 
+        return ctx.editMessageText(`🎯 **العروض والأسعار المتوفرة لـ ${name}:**`, Markup.inlineKeyboard(buttons)); 
+    }
     if (data.startsWith("buy#")) {
-        const parts = data.split('#'); let type = parts; let name = parts; let item = parts; let price = parseFloat(parts); userStates[uId] = { type, name, item, price };
+        const parts = data.split('#'); let type = parts[1]; let name = parts[2]; let item = parts[3]; let price = parseFloat(parts[4]); userStates[uId] = { type, name, item, price };
         if (type === "card") { userStates[uId].action = 'confirmed'; return ctx.reply(`🎯 **تأكيد شراء البطاقة:**\nالمنتج: ${item}\nالسعر: ${price}$\n━━━━━━━━━━━━━━━━━━━━\nاضغط على الزر بالأسفل لإتمام الطلب والخصم المالي:`, Markup.inlineKeyboard([[Markup.button.callback("🚀 تأكيد وشراء البطاقة فوراً", "confirm_order")]])); }
         else { userStates[uId].action = 'await_game_id'; return ctx.reply(`✍️ يرجى كتابة رقم **الآيدي (ID)** الخاص بحسابك في لعبة ${name} بدقة للمتابعة:`); }
     }
     if (data === "confirm_order") {
         const state = userStates[uId]; if (!state) return ctx.reply("❌ لا يوجد طلب نشط."); let userBal = db.users[uId]?.balance_usd || 0; if (userBal < state.price) return ctx.reply(`❌ رصيدك الحالي ($${userBal.toFixed(2)}) لا يكفي لشراء هذا المنتج! يرجى شحن محفظتك أولاً.`);
-        let adminMsg = `📥 **طلب شراء جديد قيد الانتظار:**\n\n👤 العميل: ${ctx.from.first_name}\n🆔 آيدي التليجرام: \`${uId}\`\n🏦 رصيد محفظة الزبون: $${userBal.toFixed(2)}\n🎯 الخدمة المطلوبة: *${state.item}*\n💵 سعر المنتج: *${state.price}$*\n🆔 آيدي اللاعب (إن وجد): \`${state.gameId || 'طلب بطاقة رقمية'}\``;
-        let adminButtons = Markup.inlineKeyboard([[Markup.button.callback("✅ قبول الطلب وتسليم الكود", `order_dec#accept#${uId}#${state.price}#${state.item}`)], [Markup.button.callback("❌ رفض وإلغاء الطلب بالكامل", `order_dec#reject#${uId}#${state.price}#${state.item}`)]]);
-        await ctx.telegram.sendMessage(config.ADMIN_CHANNEL_ID, adminMsg, { reply_markup: adminButtons.reply_markup, parse_mode: 'Markdown' }); ctx.reply("🚀 تم إرسال طلب الشراء الخاص بك بنجاح تامي إلى الإدارة للمراجعة. سيتم تسليم الكود لك هنا فور موافقة المسؤول!"); userStates[uId] = null;
-    }
-    if (data === "ch#usd" || data === "ch#syr") { return ctx.editMessageText(data === "ch#usd" ? "💵 اختر المبلغ الذي تريد شحنه بالدولار:" : "🇸🇾 اختر الفئة التي قمت بتحويلها بالليرة السورية:", data === "ch#usd" ? menus.chargeValuesMenu : menus.chargeSyrMenu); }
-    if (data.startsWith("amt#") || data.startsWith("amts#")) { let isUsd = data.startsWith("amt#"); let val = parseFloat(data.split('#')); let usdVal = isUsd ? val : (val / rate); userStates[uId] = { action: 'await_proof', amountStr: isUsd ? `${val}$` : `${val.toLocaleString()} ل.س`, usdValue: usdVal.toFixed(2) }; return ctx.reply(`💳 **لقد اخترت شحن فئة (${userStates[uId].amountStr})**\n\nقم بالتحويل الآن لحساب الإدارة المعتمد، ثم أرسل (صورة الوصل أو رمز العملية النصي) هنا في الشات فوراً ليتم الشحن التلقائي فور التأكيد:`); }
-});
-
-bot.launch().then(() => console.log("🚀 تم تفعيل المحرك الملكي العظيم، متجرك مستقر الآن 100% مدى الحياة بدون أكواد!"));
