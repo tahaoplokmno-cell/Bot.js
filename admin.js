@@ -1,11 +1,14 @@
 const { Markup } = require('telegraf');
-let adminNotes = "لا توجد ملاحظات مسجلة حالياً في الدفتر.";
 
 function getAdminPanel(db) {
+    // جلب البيانات من قاعدة البيانات مباشرة لضمان دقتها
     const totalUsers = Object.keys(db.users || {}).length;
     const currentRate = db.exchange_rate || 14500;
     const bannedCount = Object.keys(db.banned || {}).length;
     const mutedCount = Object.keys(db.muted || {}).length;
+    
+    // إذا لم تكن هناك ملاحظات مسجلة في قاعدة البيانات، نضع نصاً ترحيبياً
+    const adminNotes = db.admin_notes || "لا توجد ملاحظات مسجلة حالياً في الدفتر.";
 
     let stats = `💀 **نظام السيطرة المطلقة على السيستم (SYSTEM CORE)** 💀\n` +
                 `━━━━━━━━━━━━━━━━━━━━\n` +
@@ -33,5 +36,12 @@ function getAdminPanel(db) {
         ])
     };
 }
-function saveNotes(ctx, text) { adminNotes = text; ctx.reply("✅ تم تحديث وحفظ دفتر الملاحظات بنجاح!"); }
+
+// تعديل الدالة لحفظ الملاحظات داخل قاعدة البيانات لكي لا تضيع أبداً
+function saveNotes(ctx, text, db, saveDB) { 
+    db.admin_notes = text; 
+    if (typeof saveDB === 'function') saveDB(); // حفظ التعديل في ملف database.json
+    ctx.reply("✅ تم تحديث وحفظ دفتر الملاحظات بنجاح داخل السيستم!"); 
+}
+
 module.exports = { getAdminPanel, saveNotes };
