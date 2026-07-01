@@ -1,67 +1,55 @@
-const telegrafMod = require('telegraf');
-const Telegraf = telegrafMod.Telegraf;
-const fs = require('fs');
-const config = require('./config');
-const menus = require('./menus');
-const admin = require('./admin');
-const actions = require('./actions');
-const callbacks = require('./callbacks'); 
-const shop = require('./shop'); // استدعاء ملف المتجر القصير الجديد
+const { Telegraf, Markup } = require('telegraf'); const fs = require('fs');
+const config = require('./config'); const menus = require('./menus');
+const shop = require('./shop'); const charge = require('./charge');
+const devBot = require('./dev_bot'); const admin = require('./admin');
+const adminNotes = require('./admin_notes');
 
-const bot = new Telegraf(config.BOT_TOKEN);
-const DB_FILE = './database.json';
-let db = { users: {}, exchange_rate: 15000, banned: {}, muted: {} };
+const bot = new Telegraf(config.BOT_TOKEN); const DB_FILE = './database.json';
+let db = { users: {}, exchange_rate: 15000, banned: {} };
 if (fs.existsSync(DB_FILE)) { try { db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8')); } catch(e){} }
-if (!db.banned) db.banned = {}; if (!db.muted) db.muted = {};
-
-function saveDB() { fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 4)); }
-let userStates = {};
-
-bot.use((ctx, next) => {
-    const uId = String(ctx.from?.id); if (!uId) return next();
-    if (db.banned[uId]) return ctx.reply("🚫 نعتذر منك، أنت محظور نهائياً.");
-    if (db.muted[uId] && ctx.message) return ctx.reply("🔇 حسابك مكتوم حالياً.");
-    return next();
-});
+const saveDB = () => fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 4)); let userStates = {};
 
 bot.command('admin', ctx => { userStates[String(ctx.chat.id)] = { action: 'await_password' }; ctx.reply("🔐 اكتب كلمة السر الملكية للتحقق:"); });
 bot.command('panel', ctx => {
-    const uId = String(ctx.chat.id);
-    if (userStates[uId]?.action === 'admin_dashboard' || uId === "8243108672") {
-        const panelData = admin.getAdminPanel(db); return ctx.reply(panelData.text, { parse_mode: 'Markdown', ...panelData.markup });
+    const uId = String(ctx.chat.id); if (userStates[uId]?.action === 'admin_dashboard' || uId === "8243108672") {
+        const p = admin.getAdminPanel(db); return ctx.reply(p.text, { parse_mode: 'Markdown', ...p.markup });
     }
     ctx.reply("❌ ليس لديك صلاحية أدمن.");
 });
-
 bot.start(async (ctx) => {
     const uId = String(ctx.chat.id); if (!db.users) db.users = {};
-    if (!db.users[uId]) { db.users[uId] = { name: ctx.from.first_name, balance_usd: 5.0 }; saveDB(); }
+    if (!db.users[uId]) { db.users[uId] = { name: ctx.from.first_name, balance_usd: 0.0 }; saveDB(); }
     const rate = db.exchange_rate || 15000; const usd = db.users[uId].balance_usd || 0;
-    let welcome = `👑 **بوت شام إن جيم** 👑\n👤 **مرحباً بك:** ${ctx.from.first_name}\n💰 **رصيدك:** $${usd.toFixed(2)} (${(usd * rate).toLocaleString()} ل.س)`;
+    let welcome = `👑 **بوت شام إن جيم | SHAM IN GAME** 👑\n━━━━━━━━━━━━━━━━━━━━\n👤 **مرحباً بك يا:** ${ctx.from.first_name || "زبوننا الغالي"}\n\n💰 **رصيد محفظتك الحالي:**\n💵 بالدولار: *${usd.toFixed(2)}$*\n🇸🇾 بالليرة السورية: *${(usd * rate).toLocaleString()} ل.س*\n\n📈 **سعر الصرف المعتمد اليوم:**\n1$ = *${rate.toLocaleString()} ل.س*\n━━━━━━━━━━━━━━━━━━━━\n⚠️ **تنويه هـام للزبائن الكرام:**\nقد يستغرق معالجة وتسليم طلبك بعض الوقت، وخاصةً في أوقات الليل، وذلك لأنني الأدمن الوحيد الذي يقوم بمراجعة وشحن الحسابات يدوياً لضمان أمانكم. شكراً لتفهمكم وصبركم معنا! ❤️`;
     await ctx.reply(welcome, { parse_mode: 'Markdown', ...menus.mainMenu });
 });
 
 bot.hears('🏪 المتجر', ctx => ctx.reply("🛍️ اختر القسم المتاح للبدء والشراء:", menus.storeMenu));
-bot.hears('💳 المحفظة', ctx => {
-    const uId = String(ctx.chat.id); const rate = db.exchange_rate || 15000; const usd = db.users[uId]?.balance_usd || 0;
-    ctx.reply(`💳 رصيدك الحالي: ${usd.toFixed(2)}$ (${(usd * rate).toLocaleString()} ل.س)`, menus.walletMenu);
-});
-bot.hears('⚙️ الإعدادات', ctx => ctx.reply(`⚙️ الاسم: ${ctx.from.first_name}\n🆔 الآيدي: \`${ctx.chat.id}\``, { parse_mode: 'Markdown' }));
-bot.hears('📞 الدعم الفني', ctx => ctx.reply(`📞 الدعم الفني: ${config.DEVELOPER_USERNAME}`));
+bot.hears('💳 المحفظة', ctx => charge.initCharge(ctx, userStates, String(ctx.chat.id)));
+bot.hears('🤖 إنشاء بوت', ctx => devBot.initBotOrder(ctx, userStates, String(ctx.chat.id)));
 
 bot.on(['text', 'photo'], async (ctx) => {
-    let state = userStates[String(ctx.chat.id)];
-    if (state && state.action === 'await_bot_desc' && ctx.message.text) { await ctx.telegram.sendMessage(config.ADMIN_CHANNEL_ID, `🤖 **طلب بوت:** ${ctx.message.text}`); ctx.reply("🚀 تم الإرسال."); userStates[String(ctx.chat.id)] = null; }
+    const uId = String(ctx.chat.id); let state = userStates[uId]; if (!state) return;
+    if (state.action === 'await_password' && ctx.message.text === config.ADMIN_PASSWORD) { userStates[uId] = { action: 'admin_dashboard' }; return ctx.reply("✅ تم التحقق! اكتب الآن الأمر /panel لفتح لوحة التحكم."); }
+    if (state.action === 'await_new_notes') return adminNotes.saveNewNotes(ctx, ctx.message.text, uId, userStates, db, admin.getAdminPanel);
+    if (state.action.startsWith('await_charge') || state.action === 'await_proof') return charge.handleChargeSteps(ctx, state, uId, userStates);
+    if (state.action === 'await_bot_desc' && ctx.message.text) return devBot.askServer(ctx, ctx.message.text, uId, userStates);
+    if (state.action === 'await_game_id' && ctx.message.text) {
+        userStates[uId] = { ...state, action: 'confirmed', gameId: ctx.message.text };
+        return ctx.reply(`🎯 **مراجعة وتأكيد طلب الشحن:**\n\n🆔 آيدي حسابك في اللعبة: \`${ctx.message.text}\`\n🎁 المنتج المطلوب: *${state.item}*`, { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback("🚀 تأكيد وإرسال الطلب للقناة", "confirm_order")]]) });
+    }
 });
-
 bot.on('callback_query', async (ctx) => {
     const data = ctx.callbackQuery.data; const uId = String(ctx.from.id); await ctx.answerCbQuery().catch(()=>{});
-    if (await callbacks.handleStoreDecisions(ctx, bot, db, userStates, saveDB, uId)) return;
-    if (await actions.handleCallbacks(ctx, bot, db, userStates, saveDB)) return;
-    
-    // استدعاء ملف shop المصلح والقصير جداً
+    if (data === "adm#edit_notes") return adminNotes.handleNotesCallback(ctx, userStates, uId);
+    if (data === "adm#close_panel") return ctx.deleteMessage().catch(()=>{});
+    if (data.startsWith("srv#")) return devBot.handleServerChoice(ctx, data, uId, userStates);
+    if (data === "confirm_order") {
+        const state = userStates[uId]; if (!state) return ctx.reply("❌ لا يوجد طلب نشط.");
+        let chanBtn = Markup.inlineKeyboard([[Markup.button.callback("✅ قبول وتفعيل الكود", `order_dec#accept#${uId}#${state.price}`)], [Markup.button.callback("❌ رفض وإلغاء", `order_dec#reject#${uId}`)]]);
+        await ctx.telegram.sendMessage(config.ADMIN_CHANNEL_ID, `📥 **طلب شراء جديد في القناة:**\n━━━━━━━━━━━━━━━━━━━━\n👤 الزبون: ${ctx.from.first_name}\n🎯 المنتج المطلوب: *${state.item}*\n💵 السعر: *${state.price}$*\n🆔 الآيدي المرسل: \`${state.gameId || 'طلب بطاقة رقمية'}\``, { reply_markup: chanBtn.reply_markup, parse_mode: 'Markdown' });
+        ctx.reply("🚀 تم إرسال طلب الشراء الخاص بك بنجاح إلى الإدارة للمراجعة وقناتك الخاصة! سيتم إخطارك هنا فور الموافقة."); userStates[uId] = null; return;
+    }
     shop.handleStore(ctx, data, uId, db, userStates);
 });
-
-bot.launch().then(() => console.log("🚀 BOT IS RUNNING!"));
-
+bot.launch().then(() => console.log("🚀 BOT IS RUNNING PERFECTLY WITHOUT ERROR!"));
