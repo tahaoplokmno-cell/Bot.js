@@ -1,14 +1,14 @@
-const { Telegraf, Markup } = require('telegraf'); const fs = require('fs');
+const { Telegraf, Markup } = require('telegraf');
 const config = require('./config'); const menus = require('./menus');
 const shop = require('./shop'); const charge = require('./charge');
 const devBot = require('./dev_bot'); const admin = require('./admin');
 const adminActions = require('./admin_actions'); const callbacks = require('./callbacks');
 const settings = require('./settings');
+const dbFile = require('./database'); // استدعاء ملف قاعدة البيانات الذكي المصلح
 
-const bot = new Telegraf(config.BOT_TOKEN); const DB_FILE = './database.json';
-let db = { users: {}, exchange_rate: 14500, banned: {} };
-if (fs.existsSync(DB_FILE)) { try { db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8')); } catch(e){} }
-const saveDB = () => fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 4)); let userStates = {};
+const bot = new Telegraf(config.BOT_TOKEN);
+let db = dbFile.loadDB(); // تحميل البيانات الحقيقية والفلوس والنسخة الاحتياطية فوراً
+const saveDB = () => dbFile.saveDB(db); let userStates = {};
 
 bot.command('admin', ctx => { userStates[String(ctx.chat.id)] = { action: 'await_password' }; ctx.reply("🔐 اكتب كلمة السر الملكية للتحقق:"); });
 bot.command('panel', ctx => {
@@ -57,4 +57,4 @@ bot.on('callback_query', async (ctx) => {
     }
     shop.handleStore(ctx, data, uId, db, userStates);
 });
-bot.launch().then(() => console.log("🚀 SHAM SYSTEM RUNNING PERFECTLY!"));
+bot.launch().then(() => console.log("🚀 SHAM SYSTEM SECURITY ACTIVATED & RUNNING PERFECTLY!"));
