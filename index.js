@@ -27,7 +27,6 @@ bot.hears('💳 المحفظة', ctx => charge.initCharge(ctx, userStates, Strin
 bot.hears('🤖 إنشاء بوت', ctx => devBot.initBotOrder(ctx, userStates, String(ctx.chat.id)));
 bot.hears('⚙️ الإعدادات', ctx => settings.showSettings(ctx)); bot.hears('📞 الدعم الفني', ctx => settings.showSupport(ctx)); 
 
-// 1️⃣ تعديل زر استرجاع الأموال ليطلب إدخال قيمة من الزبون مباشرة
 bot.hears('⚖️ استرجاع الأموال', ctx => {
     userStates[String(ctx.chat.id)] = { action: 'await_refund_amount' };
     ctx.reply("💰 **قسم طلب استرجاع الأموال:**\n━━━━━━━━━━━━━━━━━━━━\n✍️ يرجى كتابة المبلغ الذي تريد استرجاعه ورقم حسابك لتحويل المستحقات:");
@@ -46,7 +45,6 @@ bot.on(['text', 'photo'], async (ctx) => {
     if (state.action.startsWith('await_charge') || state.action === 'await_proof') return charge.handleChargeSteps(ctx, state, uId, userStates, db);
     if (state.action === 'await_bot_desc' && ctx.message.text) return devBot.askServer(ctx, ctx.message.text, uId, userStates);
     
-    // 2️⃣ استقبال قيمة طلب الاسترجاع ومعرفة رصيد الزبون التلقائي وإرسالها لقناتك
     if (state.action === 'await_refund_amount' && ctx.message.text) {
         let uBal = db.users[uId]?.balance_usd || 0; let rate = db.exchange_rate || 14500;
         let refundMsg = `⚠️ **طلب استرجاع أموال جديد:**\n━━━━━━━━━━━━━━━━━━━━\n👤 الزبون: ${ctx.from.first_name}\n🆔 الآيدي: \`${uId}\`\n💰 **إجمالي رصيده الحالي:** *$${uBal.toFixed(2)}* (${(uBal * rate).toLocaleString()} ل.س)\n📝 **المبلغ المطلوب والتفاصيل:**\n${ctx.message.text}`;
@@ -55,9 +53,11 @@ bot.on(['text', 'photo'], async (ctx) => {
         userStates[uId] = null; return;
     }
 
-    // 3️⃣ إرسال كود ببجي والتعليمات تلقائياً وفوراً للمشترك بمجرد كتابة الآدمن للكود
+    // ⚡ تسليم كود ببجي والتعليمات فوراً للمشترك بمجرد إرسال الآدمن للكود
     if (state.action === 'admin_send_code_now' && ctx.message.text) { 
-        await bot.telegram.sendMessage(state.clientUId, 
+        const targetClient = state.clientUId || state.targetUid;
+        if (targetClient) {
+            await bot.telegram.sendMessage(targetClient, 
 `🎁 **وصلك كود الشحن الخاص بطلبك بنجاح:**
 
 \`${ctx.message.text}\`
@@ -67,8 +67,12 @@ bot.on(['text', 'photo'], async (ctx) => {
 1️⃣ يرجى الدخول للموقع المعتمد: [midasbuy.com](https://midasbuy.com)
 2️⃣ ضع آيدي حسابك والكود المستلم لتفعيله فوراً.
 3️⃣ **ملاحظة:** يجب تشغيل الـ VPN إذا كنت داخل سوريا ليفتح الموقع بنجاح!`, 
-        { parse_mode: 'Markdown', disable_web_page_preview: false }).catch(console.error);
-        ctx.reply("✅ تم تسليم الكود وتغليق الطلب بنجاح."); userStates[uId] = null; return; 
+            { parse_mode: 'Markdown', disable_web_page_preview: false }).catch(console.error);
+            ctx.reply("✅ تم تسليم الكود وتغليق الطلب بنجاح.");
+        } else {
+            ctx.reply("❌ حدث خطأ: لم يتم التعرف على آيدي الزبون في الذاكرة المؤقتة.");
+        }
+        userStates[uId] = null; return; 
     }
     
     if (state.action === 'await_game_id' && ctx.message.text) { userStates[uId] = { ...state, action: 'confirmed', gameId: ctx.message.text }; return ctx.reply(`🎯 **تأكيد طلب الشحن:**\n\n🆔 آيدي حسابك: \`${ctx.message.text}\`\n🎁 المنتج: *${state.item}*\n💵 السعر: *${state.price}$*`, { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback("✔️ تأكيد ودفع فوراً", "confirm_order")]]) }); }
@@ -77,7 +81,6 @@ bot.on(['text', 'photo'], async (ctx) => {
 bot.on('callback_query', async (ctx) => {
     const data = ctx.callbackQuery.data; const uId = String(ctx.from.id); await ctx.answerCbQuery().catch(()=>{});
     
-    // 4️⃣ تصحيح الاستدعاء التلقائي لقراءة موديول جيت هاب المحدث (callbacks) وليس charge
     if (await callbacks.handleStoreDecisions(ctx, bot, db, userStates, saveDB, uId)) return;
     
     if (data.startsWith("adm#")) return adminActions.handleAdminCallback(ctx, data, uId, userStates, db);
