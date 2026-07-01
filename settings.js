@@ -14,12 +14,16 @@ function showSupport(ctx) {
     let devUser = config.DEVELOPER_USERNAME || "@MrXT1_3";
     if (!devUser.startsWith('@')) devUser = '@' + devUser;
 
-    let msg = `📞 <b>مركز الدعم الفني المباشر:</b>\n━━━━━━━━━━━━━━━━━━━━\nإذا واجهتك أي مشكلة في الشحن, أو تأخر تسليم كود ببجي، يرجى مراسلة الإدارة والمطور مباشرة عبر المعرف التالي:\n\n💬 الدعم الفني: <b>${devUser}</b>\n\n⏱️ متواجدون لخدمتكم وضمان أمان شحناتكم بأسرع وقت ممكن! ❤️`;
+    let msg = `📞 <b>مركز الدعم الفني المباشر:</b>\n━━━━━━━━━━━━━━━━━━━━\nإذا واجهتك أي مشكلة في الشحن، أو تأخر تسليم كود ببجي، يرجى مراسلة الإدارة والمطور مباشرة عبر المعرف التالي:\n\n💬 الدعم الفني: <b>${devUser}</b>\n\n⏱️ متواجدون لخدمتكم وضمان أمان شحناتكم بأسرع وقت ممكن! ❤️`;
     
-    // 🟢 تم إصلاح علامة الـ $ الناقصة هنا في الرابط ليعمل فوراً
-    const cleanUser = devUser.replace('@', '');
+    // تنظيف المعرف تماماً من علامة @
+    const usernameClean = devUser.replace('@', '');
+    
+    // دمج الرابط بأبسط وأضمن طريقة نصية لمنع أي خطأ في الجيت هب
+    const finalUrl = "https://t.me" + usernameClean;
+
     const supportLinkBtn = Markup.inlineKeyboard([
-        [Markup.button.url("💬 اضغط هنا لمراسلة الدعم فوراً", `https://t.me{cleanUser}`)],
+        [Markup.button.url("💬 اضغط هنا لمراسلة الدعم فوراً", finalUrl)],
         [Markup.button.callback("🔙 العودة للقائمة الرئيسية", "main_menu")]
     ]);
 
