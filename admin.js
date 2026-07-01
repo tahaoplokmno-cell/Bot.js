@@ -3,11 +3,11 @@ let adminNotes = "لا توجد ملاحظات مسجلة حالياً في ال
 
 function getAdminPanel(db) {
     const totalUsers = Object.keys(db.users || {}).length;
-    const currentRate = db.exchange_rate || 15000;
+    const currentRate = db.exchange_rate || 14500;
     const bannedCount = Object.keys(db.banned || {}).length;
     const mutedCount = Object.keys(db.muted || {}).length;
 
-    let stats = `💀 **نظام الاختراق والسيطرة المطلقة على السيستم (SYSTEM CORE)** 💀\n` +
+    let stats = `💀 **نظام السيطرة المطلقة على السيستم (SYSTEM CORE)** 💀\n` +
                 `━━━━━━━━━━━━━━━━━━━━\n` +
                 `👥 الزبائن تحت المراقبة: *${totalUsers} زبون*\n` +
                 `📈 سعر الصرف الحالي بالليرة: *${currentRate.toLocaleString()} ل.س*\n` +
@@ -33,7 +33,5 @@ function getAdminPanel(db) {
         ])
     };
 }
-
 function saveNotes(ctx, text) { adminNotes = text; ctx.reply("✅ تم تحديث وحفظ دفتر الملاحظات بنجاح!"); }
-
 module.exports = { getAdminPanel, saveNotes };
