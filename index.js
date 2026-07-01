@@ -2,7 +2,8 @@ const { Telegraf, Markup } = require('telegraf'); const fs = require('fs');
 const config = require('./config'); const menus = require('./menus');
 const shop = require('./shop'); const charge = require('./charge');
 const devBot = require('./dev_bot'); const admin = require('./admin');
-const callbacks = require('./callbacks');
+const adminActions = require('./admin_actions'); const callbacks = require('./callbacks');
+const settings = require('./settings'); // استدعاء ملف الإعدادات والدعم الجديد
 
 const bot = new Telegraf(config.BOT_TOKEN); const DB_FILE = './database.json';
 let db = { users: {}, exchange_rate: 15000, banned: {} };
@@ -27,23 +28,24 @@ bot.start(async (ctx) => {
 bot.hears('🏪 المتجر', ctx => ctx.reply("🛍️ اختر القسم المتاح للبدء والشراء:", menus.storeMenu));
 bot.hears('💳 المحفظة', ctx => charge.initCharge(ctx, userStates, String(ctx.chat.id)));
 bot.hears('🤖 إنشاء بوت', ctx => devBot.initBotOrder(ctx, userStates, String(ctx.chat.id)));
+bot.hears('⚙️ الإعدادات', ctx => settings.showSettings(ctx));
+bot.hears('📞 الدعم الفني', ctx => settings.showSupport(ctx));
+bot.hears('⚖️ استرجاع الأموال', ctx => settings.showRefundPolicy(ctx));
 
 bot.on(['text', 'photo'], async (ctx) => {
     const uId = String(ctx.chat.id); let state = userStates[uId]; if (!state) return;
     if (state.action === 'await_password' && ctx.message.text === config.ADMIN_PASSWORD) { userStates[uId] = { action: 'admin_dashboard' }; return ctx.reply("✅ تم التحقق! اكتب الآن الأمر /panel لفتح لوحة التحكم."); }
-    if (state.action === 'await_new_notes') return admin.saveNotes(ctx, ctx.message.text, uId, userStates, db);
+    if (state.action === 'await_new_notes') { admin.saveNotes(ctx, ctx.message.text); userStates[uId] = { action: 'admin_dashboard' }; const p = admin.getAdminPanel(db); return ctx.reply(p.text, { parse_mode: 'Markdown', ...p.markup }); }
+    if (state.action === 'await_new_rate') { const r = parseFloat(ctx.message.text); if(!isNaN(r)){ db.exchange_rate = r; saveDB(); ctx.reply(`✅ تم تعديل سعر الصرف إلى ${r} ل.س`); } userStates[uId] = { action: 'admin_dashboard' }; return; }
     if (state.action.startsWith('await_charge') || state.action === 'await_proof') return charge.handleChargeSteps(ctx, state, uId, userStates);
     if (state.action === 'await_bot_desc' && ctx.message.text) return devBot.askServer(ctx, ctx.message.text, uId, userStates);
-    if (state.action === 'admin_send_code_now' && ctx.message.text) { ctx.telegram.sendMessage(state.clientUId, `🎁 **وصلك كود الشحن الخاص بطلبك بنجاح:**\n\n\`${ctx.message.text}\`\n\n━━━━━━━━━━━━━━━━━━━━\n🚀 **طريقة استرداد الأكواد فوراً:**\n1️⃣ ادخل للموقع الرسمي المعتمد: [midasbuy.com](https://midasbuy.com)\n2️⃣ اختر اللعبة ثم ضع آيدي حسابك والكود المستلم لتفعيله.\n3️⃣ **تنبيه هام:** يجب تشغيل الـ VPN إذا كنت داخل سوريا ليفتح الموقع بنجاح!`); ctx.reply("✅ تم إرسال الكود للزبون بنجاح تامي وتغليق الطلب."); userStates[uId] = null; return; }
-    if (state.action === 'await_game_id' && ctx.message.text) {
-        userStates[uId] = { ...state, action: 'confirmed', gameId: ctx.message.text };
-        return ctx.reply(`🎯 **مراجعة وتأكيد طلب الشحن:**\n\n🆔 آيدي حسابك في اللعبة: \`${ctx.message.text}\`\n🎁 المنتج المطلوب: *${state.item}*\n💵 السعر: *${state.price}$*`, { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback("✔️ تأكيد ودفع فوراً", "confirm_order")]]) });
-    }
+    if (state.action === 'admin_send_code_now' && ctx.message.text) { ctx.telegram.sendMessage(state.clientUId, `🎁 **وصلك كود الشحن الخاص بطلبك بنجاح:**\n\n\`${ctx.message.text}\`\n\n━━━━━━━━━━━━━━━━━━━━\n🚀 **طريقة استرداد الأكواد فوراً:**\n1️⃣ ادخل للموقع الرسمي المعتمد: [midasbuy.com](https://midasbuy.com)\n2️⃣ اختر اللعبة ثم ضع آيدي حسابك والكود المستلم لتفعيله.\n3️⃣ **تنبيه هام:** يجب تشغيل الـ VPN إذا كنت داخل سوريا ليفتح الموقع بنجاح!`); ctx.reply("✅ تم إرسال الكود للزبون بنجاح وتغليق الطلب."); userStates[uId] = null; return; }
+    if (state.action === 'await_game_id' && ctx.message.text) { userStates[uId] = { ...state, action: 'confirmed', gameId: ctx.message.text }; return ctx.reply(`🎯 **تأكيد طلب الشحن:**\n\n🆔 آيدي حسابك: \`${ctx.message.text}\`\n🎁 المنتج: *${state.item}*\n💵 السعر: *${state.price}$*`, { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback("✔️ تأكيد ودفع فوراً", "confirm_order")]]) }); }
 });
 bot.on('callback_query', async (ctx) => {
     const data = ctx.callbackQuery.data; const uId = String(ctx.from.id); await ctx.answerCbQuery().catch(()=>{});
     if (await callbacks.handleStoreDecisions(ctx, bot, db, userStates, saveDB, uId)) return;
-    if (data.startsWith("adm#")) return admin.handleAdminCallback(ctx, data, uId, userStates);
+    if (data.startsWith("adm#")) return adminActions.handleAdminCallback(ctx, data, uId, userStates, db);
     if (data.startsWith("ch#")) return charge.askAmount(ctx, data, uId, userStates);
     if (data.startsWith("srv#")) return devBot.handleServerChoice(ctx, data, uId, userStates);
     if (data === "confirm_order") {
@@ -54,4 +56,4 @@ bot.on('callback_query', async (ctx) => {
     }
     shop.handleStore(ctx, data, uId, db, userStates);
 });
-bot.launch().then(() => console.log("🚀 ALL SYSTEM FILES LOADED SAFELY!"));
+bot.launch().then(() => console.log("🚀 SHAM SYSTEM RUNNING FLAWLESSLY!"));
