@@ -5,8 +5,7 @@ const menus = require('./menus');
 const admin = require('./admin');
 const custom = require('./custom_items');
 const actions = require('./actions');
-const router = require('./router');
-const callbacks = require('./callbacks'); // استدعاء الملف الجديد
+const callbacks = require('./callbacks');
 
 const bot = new Telegraf(config.BOT_TOKEN);
 const DB_FILE = './database.json';
@@ -67,7 +66,6 @@ bot.on(['text', 'photo'], async (ctx) => {
         }
         if (state.action === 'await_bot_desc' && ctx.message.text) { await ctx.telegram.sendMessage(config.ADMIN_CHANNEL_ID, `🤖 **طلب تصميم بوت جديد:**\n👤 العميل: ${ctx.from.first_name}\n📝 المواصفات:\n${ctx.message.text}`); ctx.reply("🚀 تم إرسال مواصفات البوت للمطور بنجاح."); userStates[String(ctx.chat.id)] = null; return; }
     }
-    await router.handleMessages(ctx, userStates, db, saveDB);
 });
 
 bot.on('callback_query', async (ctx) => {
@@ -77,9 +75,9 @@ bot.on('callback_query', async (ctx) => {
 
     if (data === "m#games" || data === "m#cards") { const isGame = data === "m#games"; const source = isGame ? custom.MY_CUSTOM_GAMES : custom.MY_CUSTOM_CARDS; let buttons = Object.keys(source).map(g => [Markup.button.callback((isGame ? "🎮 " : "🎟️ ") + g, (isGame ? "vg#" : "vc#") + g)]); return ctx.editMessageText(isGame ? "🎮 **اختر اللعبة المطلوبة لتصفح الفئات:**" : "🎟️ **اختر نوع البطاقات الرقمية المطلوبة:**", Markup.inlineKeyboard(buttons)); }
     if (data === "bot_order#start") { userStates[uId] = { action: 'await_bot_desc' }; return ctx.reply("🤖 **قسم إنشاء وتصميم بوت خاص:**\n\nاكتب الآن نوع البوت والمواصفات التي تريد برمجتها بوضوح في رسالة واحدة ليراجعها المطور:"); }
-    if (data.startsWith("vg#") || data.startsWith("vc#")) { const isGame = data.startsWith("vg#"); const name = data.split('#')[1]; const list = isGame ? custom.MY_CUSTOM_GAMES[name] : custom.MY_CUSTOM_CARDS[name]; let buttons = list.map(item => { let price = parseFloat(item.split('-')[1]); return [Markup.button.callback(item, "buy#" + (isGame ? "game" : "card") + "#" + name + "#" + item + "#" + price)]; }); return ctx.editMessageText(`🎯 **العروض والأسعار المتوفرة لـ ${name}:**`, Markup.inlineKeyboard(buttons)); }
+    if (data.startsWith("vg#") || data.startsWith("vc#")) { const isGame = data.startsWith("vg#"); const name = data.split('#'); const list = isGame ? custom.MY_CUSTOM_GAMES[name] : custom.MY_CUSTOM_CARDS[name]; let buttons = list.map(item => { let price = parseFloat(item.split('-')); return [Markup.button.callback(item, "buy#" + (isGame ? "game" : "card") + "#" + name + "#" + item + "#" + price)]; }); return ctx.editMessageText(`🎯 **العروض والأسعار المتوفرة لـ ${name}:**`, Markup.inlineKeyboard(buttons)); }
     if (data.startsWith("buy#")) {
-        const parts = data.split('#'); let type = parts[1]; let name = parts[2]; let item = parts[3]; let price = parseFloat(parts[4]); userStates[uId] = { type, name, item, price };
+        const parts = data.split('#'); let type = parts; let name = parts; let item = parts; let price = parseFloat(parts); userStates[uId] = { type, name, item, price };
         if (type === "card") { userStates[uId].action = 'confirmed'; return ctx.reply(`🎯 **تأكيد شراء البطاقة:**\nالمنتج: ${item}\nالسعر: ${price}$\n━━━━━━━━━━━━━━━━━━━━\nاضغط على الزر بالأسفل لإتمام الطلب والخصم المالي:`, Markup.inlineKeyboard([[Markup.button.callback("🚀 تأكيد وشراء البطاقة فوراً", "confirm_order")]])); }
         else { userStates[uId].action = 'await_game_id'; return ctx.reply(`✍️ يرجى كتابة رقم **الآيدي (ID)** الخاص بحسابك في لعبة ${name} بدقة للمتابعة:`); }
     }
@@ -90,5 +88,7 @@ bot.on('callback_query', async (ctx) => {
         await ctx.telegram.sendMessage(config.ADMIN_CHANNEL_ID, adminMsg, { reply_markup: adminButtons.reply_markup, parse_mode: 'Markdown' }); ctx.reply("🚀 تم إرسال طلب الشراء الخاص بك بنجاح تامي إلى الإدارة للمراجعة. سيتم تسليم الكود لك هنا فور موافقة المسؤول!"); userStates[uId] = null;
     }
     if (data === "ch#usd" || data === "ch#syr") { return ctx.editMessageText(data === "ch#usd" ? "💵 اختر المبلغ الذي تريد شحنه بالدولار:" : "🇸🇾 اختر الفئة التي قمت بتحويلها بالليرة السورية:", data === "ch#usd" ? menus.chargeValuesMenu : menus.chargeSyrMenu); }
-    if (data.startsWith("amt#") || data.startsWith("amts#")) { let isUsd = data.startsWith("amt#"); let val = parseFloat(data.split('#')[1]); let usdVal = isUsd ? val : (val / rate); userStates[uId] = { action: 'await_proof', amountStr: isUsd ? `${val}$` : `${val.toLocaleString()} ل.س`, usdValue: usdVal.toFixed(2) }; return ctx.reply(`💳 **لقد اخترت شحن فئة (${userStates[uId].amountStr})**\n\nقم بالتحويل الآن لحساب الإدارة المعتمد، ثم أرسل (صورة الوصل أو رمز العملية النصي) هنا في الشات فوراً ليتم الشحن التلقائي فور التأكيد:`); }
+    if (data.startsWith("amt#") || data.startsWith("amts#")) { let isUsd = data.startsWith("amt#"); let val = parseFloat(data.split('#')); let usdVal = isUsd ? val : (val / rate); userStates[uId] = { action: 'await_proof', amountStr: isUsd ? `${val}$` : `${val.toLocaleString()} ل.س`, usdValue: usdVal.toFixed(2) }; return ctx.reply(`💳 **لقد اخترت شحن فئة (${userStates[uId].amountStr})**\n\nقم بالتحويل الآن لحساب الإدارة المعتمد، ثم أرسل (صورة الوصل أو رمز العملية النصي) هنا في الشات فوراً ليتم الشحن التلقائي فور التأكيد:`); }
 });
+
+bot.launch().then(() => console.log("🚀 تم تفعيل المحرك الملكي العظيم، متجرك مستقر الآن 100% مدى الحياة بدون أكواد!"));
