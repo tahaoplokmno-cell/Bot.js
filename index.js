@@ -10,7 +10,8 @@ const adminActions = require('./admin_actions');
 const callbacks = require('./callbacks'); 
 const settings = require('./settings'); 
 const dbFile = require('./database');
-const textHandler = require('./handleUserTexts'); // ملف معالجة النصوص الفرعي
+const textHandler = require('./admin_text_handler');
+
 
 const bot = new Telegraf(config.BOT_TOKEN); 
 let db = dbFile.loadDB(); 
