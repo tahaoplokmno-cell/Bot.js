@@ -22,4 +22,3 @@ function handleServerChoice(ctx, data, uId, userStates) {
     userStates[uId] = null;
 }
 module.exports = { initBotOrder, askServer, handleServerChoice };
-
