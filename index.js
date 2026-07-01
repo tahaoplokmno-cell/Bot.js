@@ -1,7 +1,9 @@
-const { Telegraf, Markup } = require('telegraf'); const fs = require('fs'), path = require('path');
+const { Telegraf, Markup } = require('telegraf'); 
+const fs = require('fs'), path = require('path');
 const config = require('./config'), menus = require('./menus'), shop = require('./shop'), charge = require('./charge'), devBot = require('./dev_bot'), settings = require('./settings'), admin = require('./admin'), adminActions = require('./admin_actions'), dbFile = require('./database');
 
-const bot = new Telegraf(config.BOT_TOKEN); let db = dbFile.loadDB(), saveDB = () => dbFile.saveDB(db), userStates = {};
+const bot = new Telegraf(config.BOT_TOKEN); 
+let db = dbFile.loadDB(), saveDB = () => dbFile.saveDB(db), userStates = {};
 const openPanel = (ctx) => { const p = admin.getAdminPanel(db); return ctx.reply(p.text, { parse_mode: 'Markdown', ...p.markup }); };
 
 if (!db.custom_store || Object.keys(db.custom_store.games).length === 0) {
@@ -24,7 +26,8 @@ bot.start(async (ctx) => {
 bot.hears('🏪 المتجر', ctx => ctx.reply("🛍️ اختر القسم المتاح للبدء والشراء:", menus.storeMenu));
 bot.hears('💳 المحفظة', ctx => charge.initCharge(ctx, userStates, String(ctx.chat.id), db));
 bot.hears('🤖 إنشاء بوت', ctx => devBot.initBotOrder(ctx, userStates, String(ctx.chat.id)));
-bot.hears('⚙️ الإعدادات', ctx => settings.showSettings(ctx)); bot.hears('📞 الدعم الفني', ctx => settings.showSupport(ctx)); 
+bot.hears('⚙️ الإعدادات', ctx => settings.showSettings(ctx)); 
+bot.hears('📞 الدعم الفني', ctx => settings.showSupport(ctx));
 
 bot.on(['text', 'photo'], async (ctx) => {
     const uId = String(ctx.chat.id); let state = userStates[uId], txt = ctx.message.text;
@@ -39,38 +42,48 @@ bot.on(['text', 'photo'], async (ctx) => {
 
     if (state.action === 'await_cat_type' && txt) { const t = txt.toLowerCase(); if (t==='games'||t==='cards') { userStates[uId] = { action: 'await_cat_name', type: t }; return ctx.reply("✍️ اكتب اسم اللعبة أو نوع البطاقة الجديد (مثال: ببجي موبايل):"); } ctx.reply("❌ اكتب games أو cards فقط!"); userStates[uId] = { action: 'admin_dashboard' }; return; }
     if (state.action === 'await_cat_name' && txt) { db.custom_store[state.type][txt] = []; saveDB(); userStates[uId] = { action: 'admin_dashboard' }; ctx.reply(`✅ تم إنشاء فئة [${txt}] بنجاح!`); return openPanel(ctx); }
-    if (state.action === 'await_offer_cat' && txt) { const found = db.custom_store.games[txt] ? 'games' : (db.custom_store.cards[txt] ? 'cards' : null); if (!found) return ctx.reply("❌ هذه الفئة غير موجودة!"); userStates[uId] = { action: 'await_offer_name_input', type: found, catName: txt }; return ctx.reply("✍️ اكتب اسم كمية الشدات أو العرض المراد إضافته (مثال: 60 شدة ببجي):"); }
+    if (state.action === 'await_offer_cat' && txt) { const found = db.custom_store.games[txt] ? 'games' : (db.custom_store.cards[txt] ? 'cards' : null); 
+        if (!found) return ctx.reply("❌ هذه الفئة غير موجودة!"); userStates[uId] = { action: 'await_offer_name_input', type: found, catName: txt }; return ctx.reply("✍️ اكتب اسم كمية الشدات أو العرض المراد إضافته (مثال: 60 شدة ببجي):"); }
     if (state.action === 'await_offer_name_input' && txt) { userStates[uId] = { ...state, action: 'await_offer_price_input', offerName: txt }; return ctx.reply(`💵 ممتاز، الآن اكتب سعر [${txt}] بالدولار الرقمي (مثال: 1.25):`); }
     if (state.action === 'await_offer_price_input' && txt) { const price = parseFloat(txt); if (isNaN(price)) return ctx.reply("❌ اكتب السعر كأرقام فقط!"); const finalOfferString = `${state.offerName} - ${price}`; db.custom_store[state.type][state.catName].push(finalOfferString); saveDB(); userStates[uId] = { action: 'admin_dashboard' }; ctx.reply("✅ تم إضافة الشدات وعرض السعر للمتجر حياً!"); return openPanel(ctx); }
     if (state.action === 'await_del_offer_name' && txt) { if (db.custom_store.games[txt]) delete db.custom_store.games[txt]; else if (db.custom_store.cards[txt]) delete db.custom_store.cards[txt]; saveDB(); userStates[uId] = { action: 'admin_dashboard' }; ctx.reply(`🗑️ تم مسح الفئة [${txt}] وعروضها نهائياً!`); return openPanel(ctx); }
     if (state.action === 'await_game_id' && txt) { state.gameId = txt; userStates[uId] = { ...state, action: 'confirmed' }; return ctx.reply(`🎯 **تأكيد الطلب:**\n🎁 المنتج: *${state.item}*\n💵 السعر: *${state.price}$*\n🆔 آيدي الحساب: \`${txt}\``, { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback("✔️ تأكيد ودفع فوراً", "confirm_order")]]) }); }
-    if (state.action.startsWith('await_charge') || state.action === 'await_proof') return charge.handleChargeSteps(ctx, state, uId, userStates, db);
+    if (state.action && (state.action.startsWith('await_charge') || state.action === 'await_proof')) return charge.handleChargeSteps(ctx, state, uId, userStates, db);
     if (state.action === 'await_bot_desc' && txt) return devBot.askServer(ctx, txt, uId, userStates);
 });
 
 bot.on('callback_query', async (ctx) => {
     const data = ctx.callbackQuery.data, uId = String(ctx.from.id); await ctx.answerCbQuery().catch(()=>{});
     if (data === "main_menu") return ctx.reply("👑 القائمة الرئيسية:", menus.mainMenu);
+    
+    // ربط أزرار المتجر لتعمل القوائم والأقسام
+    if (data === "view_games" || data === "view_cards" || data.startsWith("shop_cat#") || data.startsWith("buy_item#")) {
+        return shop.handleShopCallback(ctx, data, uId, userStates, db);
+    }
+
     if (data.startsWith("pay_approve#") || data.startsWith("pay_reject#") || data.startsWith("order_dec#") || data === "confirm_order") {
         if (data === "confirm_order") {
             const state = userStates[uId]; if (!state) return ctx.reply("❌ لا يوجد طلب نشط.");
             if((db.users[uId]?.balance_usd || 0) < state.price) return ctx.reply("❌ رصيدك غير كافٍ! اشحن محفظتك أولاً.");
-            await bot.telegram.sendMessage(config.ADMIN_CHANNEL_ID, `📥 **طلب شراء جديد:**\n🎯 المنتج: *${state.item}*\n💵 السعر: *${state.price}$*\n🆔 آيدي العميل: \`${uId}\`\n🆔 آيدي اللعبة: \`${state.gameId || 'بطاقة رقمية'}\``, { reply_markup: Markup.inlineKeyboard([[Markup.button.callback("✅ قبول وتفعيل الكود", `order_dec#accept#${uId}#${state.price}`)], [Markup.button.callback("❌ رفض وإلغاء", `order_dec#reject#${uId}`)]]).reply_markup, parse_mode: 'Markdown' }).catch(console.error);
+            await bot.telegram.sendMessage(config.ADMIN_CHANNEL_ID, `📥 **طلب شراء جديد:**\n🎯 المنتج: *${state.item}*\n💵 السعر: *${state.price}$*\n🆔 آيدي العميل: \`${uId}\``);
             ctx.reply("🚀 تم إرسال طلب الشراء للإدارة بنجاح! انتظر وصول الكود هنا."); userStates[uId] = null; return;
         }
-        const parts = data.split('#'), cId = parts[2];
+        const parts = data.split('#');
         if (data.startsWith("pay_approve#")) {
             let val = parseFloat(parts[2]), finalUsd = parts[3] === 'usd' ? val : (val / (db.exchange_rate || 14500));
             if (!db.users[parts[1]]) db.users[parts[1]] = { balance_usd: 0 }; db.users[parts[1]].balance_usd += finalUsd; saveDB();
             bot.telegram.sendMessage(parts[1], `🎉 **تم قبول وصل الشحن وتم إيداع $${finalUsd.toFixed(2)} في محفظتك.**`).catch(()=>{}); return ctx.reply("✅ تم قبول الشحن.");
         }
         if (data.startsWith("order_dec#") && parts[1] === "accept") {
+            const cId = parts[2];
             let pr = parseFloat(parts[3]); if ((db.users[cId]?.balance_usd || 0) < pr) return ctx.reply("❌ رصيد العميل لا يكفي للخصم!");
             db.users[cId].balance_usd -= pr; saveDB(); ctx.reply("✅ تم قبول الطلب وخصم الرصيد.\n✍️ أرسل كود الشحن الآن لتسليمه تلقائياً للزبون:");
             userStates[uId] = { action: 'admin_send_code_now', clientUId: cId }; return;
         }
-        bot.telegram.sendMessage(cId, `❌ **نعتذر منك، تم رفض وإلغاء طلبك من قبل الإدارة.**`).catch(()=>{}); return ctx.reply("❌ تم الرفض بنجاح.");
+        if (data.startsWith("pay_reject#")) {
+            bot.telegram.sendMessage(parts[1], `❌ **نعتذر منك، تم رفض وإلغاء طلبك من قبل الإدارة.**`).catch(()=>{}); return ctx.reply("❌ تم الرفض بنجاح.");
+        }
     }
     if (data.startsWith("adm#")) return adminActions.handleAdminCallback(ctx, data, uId, userStates, db);
     if (data.startsWith("ch#")) return charge.askAmount(ctx, data, uId, userStates);
-    if (data.startsWith("srv#")) return devBot.handleServerChoice(ctx, data, uId, userStates);
+});
