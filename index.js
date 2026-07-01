@@ -56,7 +56,6 @@ bot.on('callback_query', async (ctx) => {
     const data = ctx.callbackQuery.data, uId = String(ctx.from.id); await ctx.answerCbQuery().catch(()=>{});
     if (data === "main_menu") return ctx.reply("👑 القائمة الرئيسية:", menus.mainMenu);
     
-    // ربط أزرار المتجر لتعمل القوائم والأقسام
     if (data === "view_games" || data === "view_cards" || data.startsWith("shop_cat#") || data.startsWith("buy_item#")) {
         return shop.handleShopCallback(ctx, data, uId, userStates, db);
     }
@@ -86,4 +85,7 @@ bot.on('callback_query', async (ctx) => {
     }
     if (data.startsWith("adm#")) return adminActions.handleAdminCallback(ctx, data, uId, userStates, db);
     if (data.startsWith("ch#")) return charge.askAmount(ctx, data, uId, userStates);
+    if (data.startsWith("srv#")) return devBot.handleServerChoice(ctx, data, uId, userStates);
 });
+
+bot.launch().then(() => {
