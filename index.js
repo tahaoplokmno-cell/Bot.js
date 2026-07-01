@@ -1,4 +1,4 @@
-// index.js - النسخة النهائية المختصرة والمحمية 100%
+// index.js - النسخة البرمجية المطابقة لملفات الجيت هب 100%
 const { Telegraf, Markup } = require('telegraf'); 
 const config = require('./config'); 
 const menus = require('./menus'); 
@@ -10,8 +10,7 @@ const adminActions = require('./admin_actions');
 const callbacks = require('./callbacks'); 
 const settings = require('./settings'); 
 const dbFile = require('./database');
-const textHandler = require('./admin_text_handler');
-
+const textHandler = require('./admin_text_handler'); // مطابقة لاسم ملفك الفرعي بالنصوص
 
 const bot = new Telegraf(config.BOT_TOKEN); 
 let db = dbFile.loadDB(); 
@@ -51,7 +50,6 @@ bot.hears('⚖️ استرجاع الأموال', ctx => {
 // ================= مستمع النصوص العام الفرعي =================
 bot.on(['text', 'photo'], async (ctx) => {
     const uId = String(ctx.chat.id); let state = userStates[uId]; if (!state) return;
-    // تم توجيه كل النصوص لملفك الفرعي ليبقى الملف الرئيسي نظيفاً
     await textHandler.handleUserTexts(ctx, bot, db, userStates, saveDB, uId, state);
 });
 
@@ -59,20 +57,18 @@ bot.on(['text', 'photo'], async (ctx) => {
 bot.on('callback_query', async (ctx) => {
     const data = ctx.callbackQuery.data; const uId = String(ctx.from.id); await ctx.answerCbQuery().catch(()=>{});
     
-    // 1. زر العودة السريع للقائمة الرئيسية
     if (data === "main_menu") { return ctx.reply("👑 تم العودة للقائمة الرئيسية للبوت:", menus.mainMenu); }
     
-    // 2. تشغيل ملف الكولباك لمعالجة شحن الفلوس وقبول وخصم طلبات الألعاب ببجي فوراً
-    if (await callbacks.handleStoreDecisions(ctx, bot, db, userStates, saveDB, uId)) return;
+    // 🟢 استدعاء آمن لمعالجة شحن الفلوس وقبول وخصم طلبات ببجي
+    if (callbacks && typeof callbacks.handleStoreDecisions === 'function') {
+        if (await callbacks.handleStoreDecisions(ctx, bot, db, userStates, saveDB, uId)) return;
+    }
     
-    // 3. تمرير بقية الأزرار الفرعية للأدمن والمحفظة والسيرفرات
     if (data.startsWith("adm#")) return adminActions.handleAdminCallback(ctx, data, uId, userStates, db);
     if (data.startsWith("ch#")) return charge.askAmount(ctx, data, uId, userStates);
     if (data.startsWith("srv#")) return devBot.handleServerChoice(ctx, data, uId, userStates);
     
-    // تشغيل المتجر العام
     shop.handleStore(ctx, data, uId, db, userStates);
 });
 
-// تشغيل البوت بنجاح مطلق
-bot.launch().then(() => console.log("🚀 SHAM IN GAME BOT IS LIVE, CLEAN & 100% WORKING!"));
+bot.launch().then(() => console.log("🚀 SHAM IN GAME BOT IS LIVE & 100% WORKING!"));
