@@ -54,7 +54,8 @@ bot.on(['text', 'photo'], async (ctx) => {
 
 bot.on('callback_query', async (ctx) => {
     const data = ctx.callbackQuery.data; const uId = String(ctx.from.id); await ctx.answerCbQuery().catch(()=>{});
-    
+    if (data === "main_menu") { return ctx.reply("👑 تم العودة للقائمة الرئيسية للبوت:", menus.mainMenu); }
+
     // تحويل أزرار القبول والرفض للملف الفرعي الجديد
     if (orderHandler.handleOrderCallbacks(bot, ctx, data, uId, userStates, saveDB, db, config)) return;
     
