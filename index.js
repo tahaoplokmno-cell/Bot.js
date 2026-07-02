@@ -5,6 +5,7 @@ const bot = new Telegraf(config.BOT_TOKEN);
 let db = dbFile.loadDB(), saveDB = () => dbFile.saveDB(db), userStates = {};
 const openPanel = (ctx) => { const p = admin.getAdminPanel(db); return ctx.reply(p.text, { parse_mode: 'Markdown', ...p.markup }); };
 
+// 🎮 حقن وتأمين المنتجات الافتراضية بشكل إجباري في قاعدة البيانات لكي لا يظهر المتجر فارغاً فضحنا!
 if (!db.custom_store || !db.custom_store.games) {
     db.custom_store = {
         games: { 
@@ -49,6 +50,7 @@ bot.on(['text', 'photo'], async (ctx) => {
     if (state.action === 'await_admin_bot_pricing' && txt) { const clientUserId = state.targetCustomerId; ctx.reply("✅ تم إرسال السعر والوقت للعميل وأرشفة المعاملة!"); bot.telegram.sendMessage(clientUserId, `🎉 **تم مراجعة طلبك للمواصفات! التكلفة والوقت: [ ${txt} ] وسيتم تسليمك الملف فوراً.**`).catch(()=>{}); let archiveBtn = Markup.inlineKeyboard([[Markup.button.callback("📂 إرسال تسليم ملف البوت الجاهز", `send_file_now#${clientUserId}`)]]); bot.telegram.sendMessage(config.ADMIN_CHANNEL_ID, `📂 تم أرشفة طلب العميل (\`${clientUserId}\`)`, { reply_markup: archiveBtn.reply_markup }); userStates[uId] = null; return; }
     if (state.action === 'await_admin_upload_file' && (ctx.message.document || ctx.message.text)) { const clientUserId = state.targetCustomerId; ctx.reply("🚀 تم تسليم ملف الكود بنجاح!"); if (ctx.message.document) { await bot.telegram.sendDocument(clientUserId, ctx.message.document.file_id, { caption: "🎁 تفضل ملف البوت الخاص بك جاهز!" }).catch(()=>{}); } else { await bot.telegram.sendMessage(clientUserId, `🎁 كود البوت الخاص بك:\n\n\`${txt}\``).catch(()=>{}); } userStates[uId] = null; return; }
     
+    // شروط استقبال وحساب ضرائب شحن رصيد سيريتل وإم تي إن تلقائياً بقيمة 1.5
     if (state.action === 'await_syr_phone' && txt) { userStates[uId] = { ...state, phoneNumber: txt, action: 'await_syr_amount' }; return ctx.reply(`💸 **رقم الهاتف مقبول!**\nاكتب الآن كمية الرصيد السوري التي ترغب في شحنها (مثال: 1000 أو 5000):`); }
     if (state.action === 'await_syr_amount' && txt) {
         const syrAmount = parseFloat(txt); if (isNaN(syrAmount) || syrAmount <= 0) return ctx.reply("❌ اكتب الكمية كأرقام فقط!");
