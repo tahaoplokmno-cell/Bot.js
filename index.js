@@ -49,7 +49,6 @@ bot.on(['text', 'photo'], async (ctx) => {
     if (state.action === 'await_admin_bot_pricing' && txt) { const clientUserId = state.targetCustomerId; ctx.reply("✅ تم إرسال السعر والوقت للعميل وأرشفة المعاملة!"); bot.telegram.sendMessage(clientUserId, `🎉 **تم مراجعة طلبك للمواصفات! التكلفة والوقت: [ ${txt} ] وسيتم تسليمك الملف فوراً.**`).catch(()=>{}); let archiveBtn = Markup.inlineKeyboard([[Markup.button.callback("📂 إرسال تسليم ملف البوت الجاهز", `send_file_now#${clientUserId}`)]]); bot.telegram.sendMessage(config.ADMIN_CHANNEL_ID, `📂 تم أرشفة طلب العميل (\`${clientUserId}\`)`, { reply_markup: archiveBtn.reply_markup }); userStates[uId] = null; return; }
     if (state.action === 'await_admin_upload_file' && (ctx.message.document || ctx.message.text)) { const clientUserId = state.targetCustomerId; ctx.reply("🚀 تم تسليم ملف الكود بنجاح!"); if (ctx.message.document) { await bot.telegram.sendDocument(clientUserId, ctx.message.document.file_id, { caption: "🎁 تفضل ملف البوت الخاص بك جاهز!" }).catch(()=>{}); } else { await bot.telegram.sendMessage(clientUserId, `🎁 كود البوت الخاص بك:\n\n\`${txt}\``).catch(()=>{}); } userStates[uId] = null; return; }
     
-    // شروط استقبال وحساب ضرائب شحن رصيد سيريتل وإم تي إن تلقائياً بقيمة 1.5
     if (state.action === 'await_syr_phone' && txt) { userStates[uId] = { ...state, phoneNumber: txt, action: 'await_syr_amount' }; return ctx.reply(`💸 **رقم الهاتف مقبول!**\nاكتب الآن كمية الرصيد السوري التي ترغب في شحنها (مثال: 1000 أو 5000):`); }
     if (state.action === 'await_syr_amount' && txt) {
         const syrAmount = parseFloat(txt); if (isNaN(syrAmount) || syrAmount <= 0) return ctx.reply("❌ اكتب الكمية كأرقام فقط!");
@@ -69,34 +68,6 @@ bot.on(['text', 'photo'], async (ctx) => {
     }
     if (state.action && (state.action.startsWith('await_cat_') || state.action.startsWith('await_offer_') || state.action === 'await_del_offer_name')) { /* تمرير لملف الأدمن */ }
     if (state.action && (state.action.startsWith('await_charge') || state.action === 'await_proof')) return charge.handleChargeSteps(ctx, state, uId, userStates, db);
-bot.on('callback_query', async (ctx) => {
-    const data = ctx.callbackQuery.data, uId = String(ctx.from.id); await ctx.answerCbQuery().catch(()=>{});
-    if (data === "main_menu") return ctx.reply("👑 القائمة الرئيسية:", menus.mainMenu);
-    if (data.startsWith("m#") || data.startsWith("shop_cat#") || data.startsWith("buy_item#") || data.startsWith("view_")) return shop.handleShopCallback(ctx, data, uId, userStates, db);
-    if (data.startsWith("bot_order#") || data.startsWith("srv#") || data.startsWith("bot_dec#")) return devBot.handleServerChoice(ctx, data, uId, userStates, bot);
-    if (data.startsWith("send_file_now#")) { const targetId = data.split('#')[1]; userStates[uId] = { action: 'await_admin_upload_file', targetCustomerId: targetId }; return ctx.reply("📁 **أرسل الآن ملف البوت الجاهز (Document) ليتم توجيهه تلقائياً للزبون:**"); }
-    
-    if (data.startsWith("ref_app#") || data.startsWith("ref_rej#")) {
-        const parts = data.split('#'), targetId = parts[1], amt = parseFloat(parts[2]);
-        if (data.startsWith("ref_app#")) { if (!db.users[targetId] || db.users[targetId].balance_usd < amt) return ctx.reply("❌ رصيد العميل غير كافٍ للخصم!"); db.users[targetId].balance_usd -= amt; saveDB(); bot.telegram.sendMessage(targetId, `💸 **وافقت الإدارة على طلبك وتم خصم واسترجاع $${amt} كاش من محفظتك.**`).catch(()=>{}); return ctx.reply("✅ تم قبول العملية وخصم الرصيد بنجاح."); }
-        if (data.startsWith("ref_rej#")) { bot.telegram.sendMessage(targetId, `❌ تم رفض طلب استرجاع الأموال الخاص بك.`).catch(()=>{}); return ctx.reply("❌ تم رفض وإلغاء طلب الاسترجاع."); }
-    }
-
-    if (data.startsWith("pay_approve#") || data.startsWith("pay_reject#") || data.startsWith("order_dec#") || data === "confirm_order") {
-        if (data === "confirm_order") {
-            const state = userStates[uId]; if (!state) return ctx.reply("❌ لا يوجد طلب نشط."); if((db.users[uId]?.balance_usd || 0) < state.price) return ctx.reply("❌ رصيدك غير كافٍ!");
-            db.users[uId].balance_usd -= state.price; saveDB();
-            let adminNotice = `📥 **طلب شراء جديد بقناة الأدمن:**\n━━━━━━━━━━━━━━━━━━━━\n👤 الزبون: ${ctx.from.first_name}\n🆔 الآيدي: \`${uId}\`\n📦 العملية: *${state.item}*\n💵 القيمة: *${state.price.toFixed(2)}$*\n📞 البيانات المستهدفة: \`${state.phoneNumber || state.gameId}\``;
-            await bot.telegram.sendMessage(config.ADMIN_CHANNEL_ID, adminNotice); userStates[uId] = null; return ctx.reply("🚀 **تم الخصم بنجاح وإرسال الطلب لقناة الإدارة لتسليمك يدوياً فوراً!**");
-        }
-        const parts = data.split('#'), cId = parts[1];
-        if (data.startsWith("pay_approve#")) {
-            let val = parseFloat(parts[2]), finalUsd = parts[3] === 'usd' ? val : (val / (db.exchange_rate || 14500));
-            if (!db.users[cId]) db.users[cId] = { balance_usd: 0 }; db.users[cId].balance_usd += finalUsd; saveDB();
-            bot.telegram.sendMessage(cId, `🎉 تم إيداع $${finalUsd.toFixed(2)} in محفظتك.`).catch(()=>{}); return ctx.reply("✅ تم قبول الشحن.");
-        }
-        if (data.startsWith("pay_reject#")) { bot.telegram.sendMessage(cId, `❌ تم رفض طلب الشحن من قبل الإدارة.`).catch(()=>{}); return ctx.reply("❌ تم الرفض."); }
-    }
     if (data.startsWith("adm#")) return adminActions.handleAdminCallback(ctx, data, uId, userStates, db);
     if (data.startsWith("ch#")) return charge.askAmount(ctx, data, uId, userStates);
 });
