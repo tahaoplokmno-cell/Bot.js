@@ -5,16 +5,15 @@ const bot = new Telegraf(config.BOT_TOKEN);
 let db = dbFile.loadDB(), saveDB = () => dbFile.saveDB(db), userStates = {};
 const openPanel = (ctx) => { const p = admin.getAdminPanel(db); return ctx.reply(p.text, { parse_mode: 'Markdown', ...p.markup }); };
 
-// 🎮 حقن وتأمين المنتجات الافتراضية بشكل إجباري في قاعدة البيانات لكي لا يظهر المتجر فارغاً فضحنا!
-if (!db.custom_store || !db.custom_store.games) {
-    db.custom_store = {
-        games: { 
-            "ببجي موبايل": ["60 شدة - 1.00", "325 شدة - 5.00", "660 شدة - 10.00", "1800 شدة - 25.00"],
-            "بطاقات ستيم STEAM": ["فئة 5$ - 5.50", "فئة 10$ - 11.00"],
-            "بطاقات إكس بوكس XBOX": ["فئة 10$ - 10.50", "فئة 25$ - 26.00"]
-        }
-    }; saveDB();
-}
+// 🎮 تصفير وحقن الأقسام الجديدة تلقائياً لضمان عمل المتجر والبطاقات فوراً وبثبات
+db.custom_store = {
+    games: { 
+        "ببجي موبايل": ["60 شدة - 1.00", "325 شدة - 5.00", "660 شدة - 10.00", "1800 شدة - 25.00"],
+        "بطاقات ستيم STEAM": ["فئة 5$ - 5.50", "فئة 10$ - 11.00"],
+        "بطاقات إكس بوكس XBOX": ["فئة 10$ - 10.50", "فئة 25$ - 26.00"]
+    }
+}; 
+saveDB();
 
 bot.command('admin', ctx => { userStates[String(ctx.chat.id)] = { action: 'await_password' }; ctx.reply("🔐 اكتب كلمة السر الملكية للتحقق:"); });
 bot.command('panel', ctx => { const uId = String(ctx.chat.id); if (userStates[uId]?.action === 'admin_dashboard' || uId === "8243108672") return openPanel(ctx); ctx.reply("❌ ليس لديك صلاحية أدمن."); });
@@ -50,7 +49,6 @@ bot.on(['text', 'photo'], async (ctx) => {
     if (state.action === 'await_admin_bot_pricing' && txt) { const clientUserId = state.targetCustomerId; ctx.reply("✅ تم إرسال السعر والوقت للعميل وأرشفة المعاملة!"); bot.telegram.sendMessage(clientUserId, `🎉 **تم مراجعة طلبك للمواصفات! التكلفة والوقت: [ ${txt} ] وسيتم تسليمك الملف فوراً.**`).catch(()=>{}); let archiveBtn = Markup.inlineKeyboard([[Markup.button.callback("📂 إرسال تسليم ملف البوت الجاهز", `send_file_now#${clientUserId}`)]]); bot.telegram.sendMessage(config.ADMIN_CHANNEL_ID, `📂 تم أرشفة طلب العميل (\`${clientUserId}\`)`, { reply_markup: archiveBtn.reply_markup }); userStates[uId] = null; return; }
     if (state.action === 'await_admin_upload_file' && (ctx.message.document || ctx.message.text)) { const clientUserId = state.targetCustomerId; ctx.reply("🚀 تم تسليم ملف الكود بنجاح!"); if (ctx.message.document) { await bot.telegram.sendDocument(clientUserId, ctx.message.document.file_id, { caption: "🎁 تفضل ملف البوت الخاص بك جاهز!" }).catch(()=>{}); } else { await bot.telegram.sendMessage(clientUserId, `🎁 كود البوت الخاص بك:\n\n\`${txt}\``).catch(()=>{}); } userStates[uId] = null; return; }
     
-    // شروط استقبال وحساب ضرائب شحن رصيد سيريتل وإم تي إن تلقائياً بقيمة 1.5
     if (state.action === 'await_syr_phone' && txt) { userStates[uId] = { ...state, phoneNumber: txt, action: 'await_syr_amount' }; return ctx.reply(`💸 **رقم الهاتف مقبول!**\nاكتب الآن كمية الرصيد السوري التي ترغب في شحنها (مثال: 1000 أو 5000):`); }
     if (state.action === 'await_syr_amount' && txt) {
         const syrAmount = parseFloat(txt); if (isNaN(syrAmount) || syrAmount <= 0) return ctx.reply("❌ اكتب الكمية كأرقام فقط!");
@@ -70,6 +68,25 @@ bot.on(['text', 'photo'], async (ctx) => {
     }
     if (state.action && (state.action.startsWith('await_cat_') || state.action.startsWith('await_offer_') || state.action === 'await_del_offer_name')) { /* تمرير لملف الأدمن */ }
     if (state.action && (state.action.startsWith('await_charge') || state.action === 'await_proof')) return charge.handleChargeSteps(ctx, state, uId, userStates, db);
+    if (data.startsWith("pay_approve#") || data.startsWith("pay_reject#") || data.startsWith("order_dec#") || data === "confirm_order") {
+        if (data === "confirm_order") {
+            const state = userStates[uId]; if (!state) return ctx.reply("❌ لا يوجد طلب نشط."); if((db.users[uId]?.balance_usd || 0) < state.price) return ctx.reply("❌ رصيدك غير كافٍ!");
+            db.users[uId].balance_usd -= state.price; saveDB();
+            let adminNotice = `📥 **طلب شراء جديد بقناة الأدمن:**\n━━━━━━━━━━━━━━━━━━━━\n👤 الزبون: ${ctx.from.first_name}\n🆔 الآيدي: \`${uId}\`\n📦 العملية: *${state.item}*\n💵 القيمة: *${state.price.toFixed(2)}$*\n📞 البيانات المستهدفة: \`${state.phoneNumber || state.gameId}\``;
+            await bot.telegram.sendMessage(config.ADMIN_CHANNEL_ID, adminNotice); userStates[uId] = null; return ctx.reply("🚀 **تم الخصم بنجاح وإرسال الطلب لقناة الإدارة لتسليمك يدوياً فوراً!**");
+        }
+        
+        // 🌟 إصلاح الفهارس (parts) لقراءة آيدي المشترك والمبلغ بدقة من أزرار القناة
+        const parts = data.split('#');
+        const cId = parts[1];
+        
+        if (data.startsWith("pay_approve#")) {
+            let val = parseFloat(parts[2]), finalUsd = parts[3] === 'usd' ? val : (val / (db.exchange_rate || 14500));
+            if (!db.users[cId]) db.users[cId] = { balance_usd: 0 }; db.users[cId].balance_usd += finalUsd; saveDB();
+            bot.telegram.sendMessage(cId, `🎉 تم إيداع $${finalUsd.toFixed(2)} في محفظتك.`).catch(()=>{}); return ctx.reply("✅ تم قبول الشحن.");
+        }
+        if (data.startsWith("pay_reject#")) { bot.telegram.sendMessage(cId, `❌ تم رفض طلب الشحن من قبل الإدارة.`).catch(()=>{}); return ctx.reply("❌ تم الرفض."); }
+    }
     if (data.startsWith("adm#")) return adminActions.handleAdminCallback(ctx, data, uId, userStates, db);
     if (data.startsWith("ch#")) return charge.askAmount(ctx, data, uId, userStates);
 });
