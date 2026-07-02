@@ -34,4 +34,3 @@ function showRefundPolicy(ctx) {
 }
 
 module.exports = { showSettings, showSupport, showRefundPolicy };
-});
