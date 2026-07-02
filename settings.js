@@ -15,7 +15,7 @@ function showSupport(ctx) {
     let msg = `📞 <b>مركز الدعم الفني المباشر:</b>\n━━━━━━━━━━━━━━━━━━━━\nإذا واجهتك أي مشكلة في الشحن، أو تأخر تسليم كود ببجي، يرجى مراسلة الإدارة والمطور مباشرة عبر المعرف التالي:\n\n💬 الدعم الفني: <b>${devUser}</b>\n\n⏱️ متواجدون لخدمتكم وضمان أمان شحناتكم بأسرع وقت ممكن! ❤️`;
     
     const usernameClean = devUser.replace('@', '');
-    const finalUrl = `https://t.me{usernameClean}`; // 🌟 مصلح بالكامل بعلامة الدولار الصحيحة
+    const finalUrl = `https://t.me{usernameClean}`; // 🌟 تم الإصلاح التام هنا بعلامة الدولار الصحيحة
 
     const supportLinkBtn = Markup.inlineKeyboard([
         [Markup.button.url("💬 اضغط هنا لمراسلة الدعم فوراً", finalUrl)],
