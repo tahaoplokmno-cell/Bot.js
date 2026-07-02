@@ -4,7 +4,7 @@ function handleShopCallback(ctx, data, uId, userStates, db) {
     const backToMain = [Markup.button.callback("🔙 العودة للقائمة الرئيسية", "main_menu")];
     if (!db.custom_store) db.custom_store = { games: {}, cards: {} };
 
-    // 1️⃣ فتح الأقسام الرئيسية (ألعاب أو بطاقات) بناءً على ضغطة المستخدم
+    // 1️⃣ فتح الأقسام الرئيسية (ألعاب أو بطاقات) بناءً على ضغطة المستخدم من menus.js
     if (data === "view_games" || data === "view_cards" || data === "m#games" || data === "m#cards") { 
         const isGame = (data === "view_games" || data === "m#games"); 
         const source = isGame ? db.custom_store.games : db.custom_store.cards; 
@@ -34,7 +34,8 @@ function handleShopCallback(ctx, data, uId, userStates, db) {
         
         // بناء الأزرار للحزم والعروض الأربعة
         let rawButtons = list.map(item => { 
-            let pr = parseFloat(item.split('-')[1]) || 0; 
+            let itemParts = item.split('-');
+            let pr = parseFloat(itemParts[1]) || 0; 
             return Markup.button.callback(item, `buy_item#${isGame ? 'game' : 'card'}#${catName}#${item}#${pr}`); 
         }); 
         
