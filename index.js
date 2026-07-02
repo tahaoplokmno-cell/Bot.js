@@ -91,3 +91,8 @@ bot.on('callback_query', async (ctx) => {
         }
     }
 });
+bot.launch().then(() => {
+    console.log("🚀 تم تشغيل البوت بنجاح وهو يعمل الآن دون توقف وكافة الأزرار مفعلة...");
+}).catch((err) => {
+    console.error("❌ حدث خطأ أثناء تشغيل البوت:", err);
+});
