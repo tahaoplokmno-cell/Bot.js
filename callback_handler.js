@@ -11,18 +11,14 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
 
     await ctx.answerCbQuery().catch(() => {});
 
-    // ===== 1️⃣ أزرار الأدمن =====
     if (data.startsWith("adm#")) {
         return adminActions.handleSuperAdminCallback(ctx, data, uId, userStates, db, bot);
     }
 
-    // ==================== المتجر كامل (مدمج هنا) ====================
     const backToMain = [Markup.button.callback("🔙 العودة للقائمة الرئيسية", "main_menu")];
     
-    // التأكد من وجود المتجر
     if (!db.custom_store) db.custom_store = { games: {} };
     
-    // الألعاب الافتراضية (إذا كانت قاعدة البيانات فاضية)
     if (Object.keys(db.custom_store.games).length === 0) {
         db.custom_store.games = {
             "🎮 ببجي موبايل": ["60 شدة - 1.00$", "325 شدة - 5.00$", "660 شدة - 10.00$", "1800 شدة - 25.00$"],
@@ -34,7 +30,6 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         dbFile.saveDB(db);
     }
 
-    // ===== عرض الألعاب =====
     if (data === "m#games") {
         const games = db.custom_store.games || {};
         const keys = Object.keys(games);
@@ -47,7 +42,6 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         });
     }
 
-    // ===== عرض منتجات القسم =====
     if (data.startsWith("shop_cat#")) {
         const catName = data.split('#')[1];
         const list = db.custom_store.games[catName] || [];
@@ -65,7 +59,6 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         });
     }
 
-    // ===== شراء منتج (طلب الآيدي) =====
     if (data.startsWith("buy_item#")) {
         const parts = data.split('#');
         const catName = parts[1];
@@ -85,7 +78,6 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         return ctx.reply(`✍️ اكتب الآيدي (ID) الخاص بك:`, { parse_mode: 'Markdown' });
     }
 
-    // ===== البطاقات =====
     if (data === "m#cards") {
         const buttons = [
             [Markup.button.callback("🎮 بطاقات ستيم", "shop_cat#🎮 بطاقات ستيم")],
@@ -98,7 +90,6 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         });
     }
 
-    // ===== شحن رصيد الهاتف =====
     if (data === "m#phone") {
         const buttons = [
             [Markup.button.callback("📱 سيريتل", "order_syr#syr")],
@@ -117,12 +108,10 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         return ctx.reply(`✍️ اكتب رقم الهاتف (${type.toUpperCase()}):`);
     }
 
-    // ===== إنشاء بوت =====
     if (data === "bot_order#start") {
         return devBot.initBotOrder(ctx, userStates, uId);
     }
 
-    // ===== الشحن =====
     if (data.startsWith("ch#")) {
         return charge.askAmount(ctx, data, uId, userStates);
     }
@@ -133,12 +122,10 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         return ctx.reply(`📸 أرسل صورة إثبات الدفع بقيمة ${amount} ${data.startsWith("amt#") ? '$' : 'ل.س'}`);
     }
 
-    // ===== قبول/رفض الدفع =====
     if (data.startsWith("pay_approve#") || data.startsWith("pay_reject#")) {
         return adminActions.handlePaymentDecision(ctx, data, uId, db, saveDB);
     }
 
-    // ===== استرجاع الأموال =====
     if (data.startsWith("ref_app#") || data.startsWith("ref_rej#")) {
         const parts = data.split("#");
         const targetId = parts[1];
@@ -165,12 +152,10 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         return ctx.reply(msg);
     }
 
-    // ===== السيرفر (إنشاء بوت) =====
     if (data.startsWith("srv#")) {
         return devBot.handleServerChoice(ctx, data, uId, userStates, bot);
     }
 
-    // ===== أزرار طلب البوت (4 أزرار) =====
     if (data.startsWith("bot_dec#")) {
         const parts = data.split("#");
         const action = parts[1];
@@ -194,14 +179,12 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         }
     }
 
-    // ===== إرسال الكود للزبون =====
     if (data.startsWith("send_code#")) {
         const clientId = data.split("#")[1];
         userStates[uId] = { action: 'await_send_code', clientUId: clientId };
         return ctx.editMessageText(`✍️ اكتب الكود الذي تريد إرساله للمستخدم ${clientId}:`);
     }
 
-    // ===== تأكيد الطلب (الشراء) =====
     if (data === "confirm_order") {
         const state = userStates[uId];
         if (!state || state.action !== 'confirmed') {
@@ -227,7 +210,6 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         return;
     }
 
-    // ===== العودة للقائمة =====
     if (data === "main_menu") {
         const mainMenu = Markup.keyboard([
             ['🏪 المتجر'],
