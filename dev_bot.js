@@ -14,8 +14,7 @@ function askContact(ctx, text, uId, userStates) {
 function askServer(ctx, text, uId, userStates) {
     const state = userStates[uId];
     userStates[uId] = { ...state, contact: text, action: 'await_srv_choice' };
-
-    let btn = Markup.inlineKeyboard([
+    const btn = Markup.inlineKeyboard([
         [Markup.button.callback("🔥 سيرفر قوي 24 ساعة", "srv#strong")],
         [Markup.button.callback("💤 سيرفر عادي 12-18 ساعة", "srv#normal")]
     ]);
@@ -27,23 +26,25 @@ function handleServerChoice(ctx, data, uId, userStates, bot) {
     const state = userStates[uId];
     if (!state) return ctx.reply("❌ انتهت الجلسة، أعد المحاولة.");
 
-    let srvName = srvType === 'strong' 
+    const srvName = srvType === 'strong' 
         ? '🔥 قوي ومحمي 24 ساعة (5$/الشهر + أسبوع مجاناً)'
         : '💤 متوسط 12-18 ساعة (2$/الشهر)';
 
     ctx.reply("🚀 جاري تأكيد طلبك وإرساله للإدارة...");
 
-    let adminMsg = `📥 **طلب إنشاء بوت جديد:**\n━━━━━━━━━━━━━━━━━━━━\n👤 الزبون: ${ctx.from.first_name}\n🆔 الآيدي: \`${uId}\`\n💬 التواصل: *${state.contact}*\n📝 المواصفات: *${state.desc}*\n🖥️ السيرفر: *${srvName}*`;
+    const adminMsg = `📥 **طلب إنشاء بوت جديد:**\n━━━━━━━━━━━━━━━━━━━━\n👤 الزبون: ${ctx.from.first_name}\n🆔 الآيدي: \`${uId}\`\n💬 التواصل: *${state.contact}*\n📝 المواصفات: *${state.desc}*\n🖥️ السيرفر: *${srvName}*`;
 
-    let btn = Markup.inlineKeyboard([
-        [Markup.button.callback("✔️ موافقة", `bot_dec#approve#${uId}`)],
-        [Markup.button.callback("❌ رفض", `bot_dec#reject#${uId}`)]
+    const btn = Markup.inlineKeyboard([
+        [Markup.button.callback("💰 السعر", `bot_dec#price#${uId}`)],
+        [Markup.button.callback("📝 الوصف", `bot_dec#desc#${uId}`)],
+        [Markup.button.callback("⏰ الوقت", `bot_dec#time#${uId}`)],
+        [Markup.button.callback("📂 إرسال ملف", `bot_dec#file#${uId}`)]
     ]);
 
-    bot.telegram.sendMessage(config.ADMIN_CHANNEL_ID, adminMsg, { 
-        reply_markup: btn.reply_markup, 
-        parse_mode: 'Markdown' 
-    }).catch(()=>{});
+    bot.telegram.sendMessage(config.ADMIN_CHANNEL_ID, adminMsg, {
+        reply_markup: btn.reply_markup,
+        parse_mode: 'Markdown'
+    }).catch(() => {});
     
     userStates[uId] = null;
 }
