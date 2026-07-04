@@ -60,8 +60,15 @@ bot.start(async (ctx) => {
 // ==================== الأزرار النصية ====================
 bot.hears('🏪 المتجر', ctx => {
     if (db.bot_maintenance && String(ctx.chat.id) !== "8243108672") return ctx.reply("🛑 في وضع الصيانة.");
-    ctx.reply("🛍️ اختر القسم:", menus.storeMenu);
+    const storeMenu = Markup.inlineKeyboard([
+        [Markup.button.callback("🎮 قسم الألعاب", "m#games")],
+        [Markup.button.callback("🎟️ قسم البطاقات", "m#cards")],
+        [Markup.button.callback("🤖 إنشاء بوت", "m#create_bot")],
+        [Markup.button.callback("🔙 العودة للقائمة الرئيسية", "main_menu")]
+    ]);
+    ctx.reply("🛍️ اختر القسم:", storeMenu);
 });
+
 bot.hears('💳 المحفظة', ctx => charge.initCharge(ctx, userStates, String(ctx.chat.id), db));
 bot.hears('🤖 إنشاء بوت', ctx => devBot.initBotOrder(ctx, userStates, String(ctx.chat.id)));
 bot.hears('⚙️ الإعدادات', ctx => settings.showSettings(ctx));
