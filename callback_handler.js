@@ -11,14 +11,14 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
 
     await ctx.answerCbQuery().catch(() => {});
 
-    // ===== 1️⃣ أزرار الأدمن =====
+    // ===== 1️⃣ أزرار الأدمن الخارقة =====
     if (data.startsWith("adm#")) {
-        return adminActions.handleAdminCallback(ctx, data, uId, userStates, db, bot);
+        return adminActions.handleSuperAdminCallback(ctx, data, uId, userStates, db, bot);
     }
 
     // ===== 2️⃣ أزرار المتجر =====
-    if (data.startsWith("shop_cat#") || data.startsWith("buy_item#") || 
-        data === "view_games" || data === "view_cards" || 
+    if (data.startsWith("shop_cat#") || data.startsWith("buy_item#") ||
+        data === "view_games" || data === "view_cards" ||
         data === "m#games" || data === "m#cards" || data === "m#phone" ||
         data.startsWith("order_syr_card#")) {
         return shop.handleShopCallback(ctx, data, uId, userStates, db);
@@ -51,7 +51,7 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         const parts = data.split("#");
         const targetId = parts[1];
         const amount = parseFloat(parts[2]) || 0;
-        
+
         if (data.startsWith("ref_app#")) {
             if (db.users[targetId]) {
                 db.users[targetId].balance_usd = (db.users[targetId].balance_usd || 0) - amount;
@@ -76,7 +76,7 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         const parts = data.split("#");
         const action = parts[1];
         const clientId = parts[2];
-        
+
         if (action === "approve") {
             userStates[clientId] = { action: 'await_admin_price_time', targetCustomerId: clientId };
             await ctx.editMessageText(`✅ تم قبول طلب البوت للمستخدم ${clientId}\n✍️ اكتب السعر والوقت المقدر:`);
@@ -102,7 +102,7 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         userStates[uId] = null;
         const msg = `✅ **تم الشراء بنجاح!**\n🎁 المنتج: *${state.item}*\n💰 الخصم: *$${state.price}*\n🆔 الآيدي: \`${state.gameId || 'غير محدد'}\``;
         await ctx.editMessageText(msg, { parse_mode: 'Markdown' });
-        await bot.telegram.sendMessage(config.ADMIN_CHANNEL_ID, 
+        await bot.telegram.sendMessage(config.ADMIN_CHANNEL_ID,
             `🛒 **طلب شراء جديد!**\n👤 ${ctx.from.first_name}\n🆔 \`${uId}\`\n🎁 ${state.item}\n💰 $${state.price}`
         ).catch(() => {});
         return;
