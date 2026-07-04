@@ -78,23 +78,38 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         return devBot.handleServerChoice(ctx, data, uId, userStates, bot);
     }
 
-    // ===== 🔟 قبول/رفض طلب البوت =====
+    // ===== 🔟 أزرار طلب البوت (4 أزرار: السعر، الوصف، الوقت، الملف) =====
     if (data.startsWith("bot_dec#")) {
         const parts = data.split("#");
         const action = parts[1];
         const clientId = parts[2];
 
-        if (action === "approve") {
-            userStates[uId] = { action: 'await_admin_price_time', targetCustomerId: clientId };
-            await ctx.editMessageText(`✅ تم قبول طلب البوت\n✍️ اكتب السعر والوقت:`);
-        } else {
-            await ctx.editMessageText(`❌ تم رفض طلب البوت`);
-            await bot.telegram.sendMessage(clientId, "❌ عذراً، تم رفض طلبك.");
+        if (action === "price") {
+            userStates[uId] = { action: 'await_bot_price', targetCustomerId: clientId };
+            return ctx.editMessageText(`✍️ اكتب السعر للمستخدم ${clientId}:`);
         }
-        return;
+        if (action === "desc") {
+            userStates[uId] = { action: 'await_bot_desc_admin', targetCustomerId: clientId };
+            return ctx.editMessageText(`✍️ اكتب وصف إضافي للمستخدم ${clientId}:`);
+        }
+        if (action === "time") {
+            userStates[uId] = { action: 'await_bot_time', targetCustomerId: clientId };
+            return ctx.editMessageText(`✍️ اكتب الوقت المتوقع للمستخدم ${clientId}:`);
+        }
+        if (action === "file") {
+            userStates[uId] = { action: 'await_bot_file', targetCustomerId: clientId };
+            return ctx.editMessageText(`📤 أرسل الملف للمستخدم ${clientId}:`);
+        }
     }
 
-    // ===== 1️⃣1️⃣ تأكيد الطلب =====
+    // ===== 1️⃣1️⃣ إرسال الكود للزبون =====
+    if (data.startsWith("send_code#")) {
+        const clientId = data.split("#")[1];
+        userStates[uId] = { action: 'await_send_code', clientUId: clientId };
+        return ctx.editMessageText(`✍️ اكتب الكود الذي تريد إرساله للمستخدم ${clientId}:`);
+    }
+
+    // ===== 1️⃣2️⃣ تأكيد الطلب =====
     if (data === "confirm_order") {
         const state = userStates[uId];
         if (!state || state.action !== 'confirmed') {
@@ -109,13 +124,19 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         userStates[uId] = null;
         const msg = `✅ **تم الشراء بنجاح!**\n🎁 المنتج: *${state.item}*\n💰 الخصم: *$${state.price}*`;
         await ctx.editMessageText(msg, { parse_mode: 'Markdown' });
+        
+        // إرسال إشعار للإدارة مع زر إرسال الكود
+        const adminBtn = Markup.inlineKeyboard([
+            [Markup.button.callback("📤 إرسال الكود للزبون", `send_code#${uId}`)]
+        ]);
         await bot.telegram.sendMessage(config.ADMIN_CHANNEL_ID,
-            `🛒 **طلب شراء جديد!**\n👤 ${ctx.from.first_name}\n🆔 \`${uId}\`\n🎁 ${state.item}\n💰 $${state.price}`
+            `🛒 **طلب شراء جديد!**\n👤 ${ctx.from.first_name}\n🆔 \`${uId}\`\n🎁 ${state.item}\n💰 $${state.price}\n🆔 الآيدي: \`${state.gameId || 'غير محدد'}\``,
+            { reply_markup: adminBtn, parse_mode: 'Markdown' }
         ).catch(() => {});
         return;
     }
 
-    // ===== 1️⃣2️⃣ العودة للقائمة =====
+    // ===== 1️⃣3️⃣ العودة للقائمة =====
     if (data === "main_menu") {
         const mainMenu = Markup.keyboard([
             ['🏪 المتجر'],
