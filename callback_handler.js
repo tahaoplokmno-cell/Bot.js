@@ -16,7 +16,7 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         return adminActions.handleSuperAdminCallback(ctx, data, uId, userStates, db, bot);
     }
 
-    // ===== 2️⃣ أزرار المتجر =====
+    // ===== 2️⃣ أزرار المتجر (من shop.js) =====
     if (data.startsWith("shop_cat#") || data.startsWith("buy_item#") ||
         data === "m#games" || data === "m#cards" || data === "m#phone" ||
         data.startsWith("order_syr#")) {
@@ -28,7 +28,7 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         return devBot.initBotOrder(ctx, userStates, uId);
     }
 
-    // ===== 4️⃣ أزرار الشحن =====
+    // ===== 4️⃣ أزرار الشحن (من charge.js) =====
     if (data.startsWith("ch#")) {
         return charge.askAmount(ctx, data, uId, userStates);
     }
@@ -104,6 +104,32 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         if (userBal < state.price) {
             return ctx.reply(`❌ رصيدك غير كافٍ! المطلوب $${state.price}`);
         }
+        db.users[uId].balance_usd = userBal - state.price;
+        saveDB(db);
+        userStates[uId] = null;
+        const msg = `✅ **تم الشراء بنجاح!**\n🎁 المنتج: *${state.item}*\n💰 الخصم: *$${state.price}*`;
+        await ctx.editMessageText(msg, { parse_mode: 'Markdown' });
+        await bot.telegram.sendMessage(config.ADMIN_CHANNEL_ID,
+            `🛒 **طلب شراء جديد!**\n👤 ${ctx.from.first_name}\n🆔 \`${uId}\`\n🎁 ${state.item}\n💰 $${state.price}`
+        ).catch(() => {});
+        return;
+    }
+
+    // ===== 1️⃣2️⃣ العودة للقائمة =====
+    if (data === "main_menu") {
+        const mainMenu = Markup.keyboard([
+            ['🏪 المتجر'],
+            ['💳 المحفظة', '💰 استرجاع الأموال'],
+            ['⚙️ الإعدادات', '📞 الدعم الفني']
+        ]).resize();
+        return ctx.editMessageText("🎯 **القائمة الرئيسية**", {
+            parse_mode: 'Markdown',
+            reply_markup: mainMenu
+        });
+    }
+
+    return ctx.reply("⚠️ هذا الزر غير مفعل حالياً.");
+};        }
         db.users[uId].balance_usd = userBal - state.price;
         saveDB(db);
         userStates[uId] = null;
