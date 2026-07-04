@@ -14,13 +14,13 @@ let db = dbFile.loadDB();
 let userStates = {};
 const saveDB = () => dbFile.saveDB(db);
 
-// ===== لوحة الأدمن الخارقة =====
+// ===== لوحة الأدمن =====
 const openSuperPanel = (ctx) => {
     const p = adminActions.getSuperAdminPanel(db);
     return ctx.reply(p.text, { parse_mode: 'Markdown', ...p.markup });
 };
 
-// ===== إعداد المتجر الافتراضي =====
+// ===== إعداد المتجر =====
 db.custom_store = db.custom_store || {};
 db.custom_store.games = db.custom_store.games || {
     "ببجي موبايل": ["60 شدة - 1.00", "325 شدة - 5.00", "660 شدة - 10.00", "1800 شدة - 25.00"],
@@ -68,7 +68,7 @@ bot.hears('🤖 إنشاء بوت', ctx => devBot.initBotOrder(ctx, userStates, 
 bot.hears('⚙️ الإعدادات', ctx => settings.showSettings(ctx));
 bot.hears('📞 الدعم الفني', ctx => settings.showSupport(ctx));
 
-// ===== استرجاع الأموال (زرين دولار + ليرة) =====
+// ===== استرجاع الأموال (زرين) =====
 bot.hears('💰 استرجاع الأموال', ctx => {
     const btn = Markup.inlineKeyboard([
         [Markup.button.callback("💵 استرجاع بالدولار", "refund#usd")],
@@ -184,7 +184,7 @@ bot.on(['text', 'photo'], async (ctx) => {
         if (!db.custom_store.games[catName]) {
             db.custom_store.games[catName] = [];
             saveDB();
-            ctx.reply(`✅ تم إضافة القسم [${catName}] بنجاح!`);
+            ctx.reply(`✅ تم إضافة القسم [${catName}]`);
         } else {
             ctx.reply(`⚠️ القسم [${catName}] موجود مسبقاً!`);
         }
@@ -198,7 +198,7 @@ bot.on(['text', 'photo'], async (ctx) => {
         if (db.custom_store?.games?.[catName]) {
             delete db.custom_store.games[catName];
             saveDB();
-            ctx.reply(`🗑️ تم حذف القسم [${catName}] بنجاح!`);
+            ctx.reply(`🗑️ تم حذف القسم [${catName}]`);
         } else {
             ctx.reply(`⚠️ القسم [${catName}] غير موجود!`);
         }
@@ -215,7 +215,7 @@ bot.on(['text', 'photo'], async (ctx) => {
             if (!isNaN(priceNum) && priceNum > 0 && db.custom_store?.games?.[category]) {
                 db.custom_store.games[category].push(`${name} - ${priceNum.toFixed(2)}`);
                 saveDB();
-                ctx.reply(`✅ تم إضافة المنتج [${name}] بقيمة $${priceNum.toFixed(2)} في قسم [${category}]`);
+                ctx.reply(`✅ تم إضافة المنتج [${name}] بقيمة $${priceNum.toFixed(2)}`);
             } else {
                 ctx.reply("❌ القسم غير موجود أو السعر غير صحيح!");
             }
@@ -236,9 +236,9 @@ bot.on(['text', 'photo'], async (ctx) => {
                 if (index !== -1) {
                     db.custom_store.games[category].splice(index, 1);
                     saveDB();
-                    ctx.reply(`🗑️ تم حذف المنتج [${productName}] من قسم [${category}]`);
+                    ctx.reply(`🗑️ تم حذف المنتج [${productName}]`);
                 } else {
-                    ctx.reply(`⚠️ المنتج [${productName}] غير موجود في قسم [${category}]`);
+                    ctx.reply(`⚠️ المنتج [${productName}] غير موجود!`);
                 }
             } else {
                 ctx.reply(`⚠️ القسم [${category}] غير موجود!`);
@@ -292,7 +292,12 @@ bot.on(['text', 'photo'], async (ctx) => {
         return;
     }
 
-    // ===== 1️⃣4️⃣ شحن رصيد سوري =====
+    // ===== 1️⃣4️⃣ طلب بوت: استقبال المواصفات =====
+    if (state.action === 'await_bot_desc' && txt) {
+        return devBot.askContact(ctx, txt, uId, userStates);
+    }
+
+    // ===== 1️⃣5️⃣ شحن رصيد سوري =====
     if (state.action === 'await_syr_phone' && txt) {
         userStates[uId] = { ...state, phoneNumber: txt, action: 'await_syr_amount' };
         return ctx.reply("💸 اكتب المبلغ:");
@@ -310,12 +315,12 @@ bot.on(['text', 'photo'], async (ctx) => {
         });
     }
 
-    // ===== 1️⃣5️⃣ معالجة الشحن =====
+    // ===== 1️⃣6️⃣ معالجة الشحن =====
     if (state.action && (state.action.startsWith('await_charge') || state.action === 'await_proof')) {
         return charge.handleChargeSteps(ctx, state, uId, userStates, db);
     }
 
-    // ===== 1️⃣6️⃣ أي رسالة غير معروفة =====
+    // ===== 1️⃣7️⃣ أي رسالة غير معروفة =====
     return ctx.reply("⚠️ لم أفهم طلبك. استخدم الأزرار من القائمة.");
 });
 
