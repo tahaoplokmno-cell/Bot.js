@@ -3,6 +3,7 @@ const adminActions = require('./admin_actions');
 const charge = require('./charge');
 const shop = require('./shop');
 const devBot = require('./dev_bot');
+const config = require('./config');
 
 module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB) {
     const data = ctx.callbackQuery.data;
@@ -15,10 +16,10 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         return adminActions.handleAdminCallback(ctx, data, uId, userStates, db, bot);
     }
 
-    // ===== 2️⃣ أزرار المتجر (من shop.js) =====
+    // ===== 2️⃣ أزرار المتجر =====
     if (data.startsWith("shop_cat#") || data.startsWith("buy_item#") || 
         data === "view_games" || data === "view_cards" || 
-        data === "m#games" || data === "m#cards" || 
+        data === "m#games" || data === "m#cards" || data === "m#phone" ||
         data.startsWith("order_syr_card#")) {
         return shop.handleShopCallback(ctx, data, uId, userStates, db);
     }
@@ -45,7 +46,48 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         return adminActions.handlePaymentDecision(ctx, data, uId, db, saveDB);
     }
 
-    // ===== 7️⃣ تأكيد الطلب =====
+    // ===== 7️⃣ أزرار استرجاع الأموال =====
+    if (data.startsWith("ref_app#") || data.startsWith("ref_rej#")) {
+        const parts = data.split("#");
+        const targetId = parts[1];
+        const amount = parseFloat(parts[2]) || 0;
+        
+        if (data.startsWith("ref_app#")) {
+            if (db.users[targetId]) {
+                db.users[targetId].balance_usd = (db.users[targetId].balance_usd || 0) - amount;
+                saveDB(db);
+                await ctx.editMessageText(`✅ تم استرجاع $${amount} للمستخدم ${targetId}`);
+                await bot.telegram.sendMessage(targetId, `✅ تم استرجاع $${amount} إلى محفظتك!`);
+            }
+        } else {
+            await ctx.editMessageText(`❌ تم رفض طلب الاسترجاع للمستخدم ${targetId}`);
+            await bot.telegram.sendMessage(targetId, "❌ عذراً، تم رفض طلب استرجاع الأموال.");
+        }
+        return;
+    }
+
+    // ===== 8️⃣ أزرار السيرفر (إنشاء بوت) =====
+    if (data.startsWith("srv#")) {
+        return devBot.handleServerChoice(ctx, data, uId, userStates, bot);
+    }
+
+    // ===== 9️⃣ أزرار قبول/رفض طلب البوت =====
+    if (data.startsWith("bot_dec#")) {
+        const parts = data.split("#");
+        const action = parts[1];
+        const clientId = parts[2];
+        
+        if (action === "approve") {
+            userStates[clientId] = { action: 'await_admin_price_time', targetCustomerId: clientId };
+            await ctx.editMessageText(`✅ تم قبول طلب البوت للمستخدم ${clientId}\n✍️ اكتب السعر والوقت المقدر:`);
+        } else {
+            await ctx.editMessageText(`❌ تم رفض طلب البوت للمستخدم ${clientId}`);
+            await bot.telegram.sendMessage(clientId, "❌ عذراً، تم رفض طلب إنشاء البوت الخاص بك.");
+        }
+        return;
+    }
+
+    // ===== 🔟 تأكيد الطلب =====
     if (data === "confirm_order") {
         const state = userStates[uId];
         if (!state || state.action !== 'confirmed') {
@@ -60,13 +102,13 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         userStates[uId] = null;
         const msg = `✅ **تم الشراء بنجاح!**\n🎁 المنتج: *${state.item}*\n💰 الخصم: *$${state.price}*\n🆔 الآيدي: \`${state.gameId || 'غير محدد'}\``;
         await ctx.editMessageText(msg, { parse_mode: 'Markdown' });
-        await bot.telegram.sendMessage(require('./config').ADMIN_CHANNEL_ID, 
+        await bot.telegram.sendMessage(config.ADMIN_CHANNEL_ID, 
             `🛒 **طلب شراء جديد!**\n👤 ${ctx.from.first_name}\n🆔 \`${uId}\`\n🎁 ${state.item}\n💰 $${state.price}`
         ).catch(() => {});
         return;
     }
 
-    // ===== 8️⃣ العودة للقائمة الرئيسية =====
+    // ===== 1️⃣1️⃣ العودة للقائمة الرئيسية =====
     if (data === "main_menu") {
         const mainMenu = Markup.keyboard([
             ['🏪 المتجر'],
@@ -79,6 +121,6 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         });
     }
 
-    // ===== 9️⃣ أي زر آخر غير معروف =====
+    // ===== 1️⃣2️⃣ أي زر آخر =====
     return ctx.reply("⚠️ هذا الزر غير مفعل حالياً.");
 };
