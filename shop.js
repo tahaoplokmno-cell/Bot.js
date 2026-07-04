@@ -17,7 +17,6 @@ function handleShopCallback(ctx, data, uId, userStates, db) {
         dbFile.saveDB(db);
     }
 
-    // ===== عرض الألعاب =====
     if (data === "m#games") {
         const games = db.custom_store.games || {};
         const keys = Object.keys(games);
@@ -30,7 +29,6 @@ function handleShopCallback(ctx, data, uId, userStates, db) {
         });
     }
 
-    // ===== عرض منتجات القسم =====
     if (data.startsWith("shop_cat#")) {
         const catName = data.split('#')[1];
         const list = db.custom_store.games[catName] || [];
@@ -48,7 +46,6 @@ function handleShopCallback(ctx, data, uId, userStates, db) {
         });
     }
 
-    // ===== شراء منتج (طلب الآيدي) =====
     if (data.startsWith("buy_item#")) {
         const parts = data.split('#');
         const catName = parts[1];
@@ -68,36 +65,6 @@ function handleShopCallback(ctx, data, uId, userStates, db) {
         return ctx.reply(`✍️ اكتب الآيدي (ID) الخاص بك:`, { parse_mode: 'Markdown' });
     }
 
-    // ===== تأكيد الشراء وإرسال الكود =====
-    if (data === "confirm_order") {
-        const state = userStates[uId];
-        if (!state || state.action !== 'confirmed') {
-            return ctx.reply("❌ لا يوجد طلب مؤكد.");
-        }
-        const userBal = db.users?.[uId]?.balance_usd || 0;
-        if (userBal < state.price) {
-            return ctx.reply(`❌ رصيدك غير كافٍ! المطلوب $${state.price}`);
-        }
-        db.users[uId].balance_usd = userBal - state.price;
-        dbFile.saveDB(db);
-        
-        const msg = `✅ **تم الشراء بنجاح!**\n🎁 المنتج: *${state.item}*\n💰 الخصم: *$${state.price}*`;
-        await ctx.editMessageText(msg, { parse_mode: 'Markdown' });
-        
-        // إرسال إشعار للإدارة مع زر إرسال الكود
-        const adminBtn = Markup.inlineKeyboard([
-            [Markup.button.callback("📤 إرسال الكود للزبون", `send_code#${uId}`)]
-        ]);
-        await ctx.telegram.sendMessage(config.ADMIN_CHANNEL_ID,
-            `🛒 **طلب شراء جديد!**\n👤 ${ctx.from.first_name}\n🆔 \`${uId}\`\n🎁 ${state.item}\n💰 $${state.price}\n🆔 الآيدي: \`${state.gameId || 'غير محدد'}\``,
-            { reply_markup: adminBtn, parse_mode: 'Markdown' }
-        ).catch(() => {});
-        
-        userStates[uId] = null;
-        return;
-    }
-
-    // ===== باقي الأزرار =====
     if (data === "m#cards") {
         const buttons = [
             [Markup.button.callback("🎮 بطاقات ستيم", "shop_cat#🎮 بطاقات ستيم")],
