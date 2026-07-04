@@ -69,7 +69,7 @@ bot.hears('⚙️ الإعدادات', ctx => settings.showSettings(ctx));
 bot.hears('📞 الدعم الفني', ctx => settings.showSupport(ctx));
 bot.hears('💰 استرجاع الأموال', ctx => {
     userStates[String(ctx.chat.id)] = { action: 'await_refund_amount' };
-    ctx.reply("✍️ اكتب المبلغ بالدولار:");
+    ctx.reply("✍️ اكتب المبلغ بالدولار أو بالليرة (مثال: 10$ أو 15000 ل.س):");
 });
 
 // ==================== الكولباك ====================
@@ -82,14 +82,14 @@ bot.on('callback_query', async (ctx) => {
     }
 });
 
-// ==================== الرسائل النصية ====================
+// ==================== الرسائل النصية (المعالج الكامل) ====================
 bot.on(['text', 'photo'], async (ctx) => {
     const uId = String(ctx.chat.id);
     const state = userStates[uId];
     const txt = ctx.message.text;
     if (!state) return;
 
-    // كلمة السر
+    // ===== 1️⃣ كلمة السر =====
     if (state.action === 'await_password') {
         if (txt === config.ADMIN_PASSWORD) {
             userStates[uId] = { action: 'admin_dashboard' };
@@ -99,7 +99,7 @@ bot.on(['text', 'photo'], async (ctx) => {
         return ctx.reply("❌ كلمة سر خاطئة!");
     }
 
-    // ملاحظات الأدمن
+    // ===== 2️⃣ ملاحظات الأدمن =====
     if (state.action === 'await_new_notes' && txt) {
         db.admin_notes = txt;
         saveDB();
@@ -107,32 +107,42 @@ bot.on(['text', 'photo'], async (ctx) => {
         return ctx.reply("✅ تم الحفظ!");
     }
 
-    // تعديل سعر الصرف
+    // ===== 3️⃣ تعديل سعر الصرف =====
     if (state.action === 'await_new_rate' && txt) {
         const r = parseFloat(txt);
-        if (!isNaN(r)) { db.exchange_rate = r; saveDB(); ctx.reply("✅ تم التعديل!"); }
-        userStates[uId] = { action: 'admin_dashboard' };
-        return;
-    }
-
-    // إهداء رصيد
-    if (state.action === 'await_gift_uid' && txt) {
-        userStates[uId] = { action: 'await_gift_amount', targetUid: txt };
-        return ctx.reply("💰 اكتب المبلغ:");
-    }
-    if (state.action === 'await_gift_amount' && txt) {
-        const amt = parseFloat(txt);
-        if (!isNaN(amt) && db.users?.[state.targetUid]) {
-            db.users[state.targetUid].balance_usd = (db.users[state.targetUid].balance_usd || 0) + amt;
-            saveDB();
-            ctx.reply("✅ تم الإرسال!");
-            bot.telegram.sendMessage(state.targetUid, `🎉 تم إيداع $${amt}`).catch(() => {});
+        if (!isNaN(r) && r > 0) { 
+            db.exchange_rate = r; 
+            saveDB(); 
+            ctx.reply(`✅ تم تعديل سعر الصرف إلى ${r} ل.س`);
+        } else {
+            ctx.reply("❌ اكتب رقماً صحيحاً!");
         }
         userStates[uId] = { action: 'admin_dashboard' };
         return;
     }
 
-    // حظر / فك حظر
+    // ===== 4️⃣ إهداء رصيد (الخطوة 1) =====
+    if (state.action === 'await_gift_uid' && txt) {
+        userStates[uId] = { action: 'await_gift_amount', targetUid: txt };
+        return ctx.reply("💰 اكتب المبلغ بالدولار:");
+    }
+    
+    // ===== 5️⃣ إهداء رصيد (الخطوة 2) =====
+    if (state.action === 'await_gift_amount' && txt) {
+        const amt = parseFloat(txt);
+        if (!isNaN(amt) && amt > 0 && db.users?.[state.targetUid]) {
+            db.users[state.targetUid].balance_usd = (db.users[state.targetUid].balance_usd || 0) + amt;
+            saveDB();
+            ctx.reply(`✅ تم إهداء $${amt} للمستخدم ${state.targetUid}`);
+            bot.telegram.sendMessage(state.targetUid, `🎉 تم إيداع $${amt} في محفظتك!`).catch(() => {});
+        } else {
+            ctx.reply("❌ المستخدم غير موجود أو المبلغ غير صحيح!");
+        }
+        userStates[uId] = { action: 'admin_dashboard' };
+        return;
+    }
+
+    // ===== 6️⃣ حظر مستخدم =====
     if (state.action === 'await_ban_uid' && txt) {
         db.banned = db.banned || {};
         db.banned[txt] = true;
@@ -140,6 +150,8 @@ bot.on(['text', 'photo'], async (ctx) => {
         userStates[uId] = { action: 'admin_dashboard' };
         return ctx.reply(`🚫 تم حظر [${txt}].`);
     }
+
+    // ===== 7️⃣ فك الحظر =====
     if (state.action === 'await_unban_uid' && txt) {
         if (db.banned) delete db.banned[txt];
         saveDB();
@@ -147,7 +159,7 @@ bot.on(['text', 'photo'], async (ctx) => {
         return ctx.reply(`🟢 تم فك حظر [${txt}].`);
     }
 
-    // إرسال إعلان
+    // ===== 8️⃣ إرسال إعلان =====
     if (state.action === 'await_broadcast_pin' && txt) {
         userStates[uId] = { action: 'admin_dashboard' };
         ctx.reply("🚀 جاري الإرسال...");
@@ -162,71 +174,129 @@ bot.on(['text', 'photo'], async (ctx) => {
         return;
     }
 
-    // إرسال كود شحن
-    if (state.action === 'admin_send_code_now' && txt && state.clientUId) {
-        bot.telegram.sendMessage(state.clientUId, `🎁 **كود الشحن:**\n\n\`${txt}\``, { parse_mode: 'Markdown' }).catch(() => {});
-        userStates[uId] = null;
-        return ctx.reply("✅ تم التسليم.");
+    // ===== 9️⃣ إضافة قسم =====
+    if (state.action === 'await_add_category' && txt) {
+        const catName = txt.trim();
+        if (!db.custom_store) db.custom_store = { games: {} };
+        if (!db.custom_store.games[catName]) {
+            db.custom_store.games[catName] = [];
+            saveDB();
+            ctx.reply(`✅ تم إضافة القسم [${catName}] بنجاح!`);
+        } else {
+            ctx.reply(`⚠️ القسم [${catName}] موجود مسبقاً!`);
+        }
+        userStates[uId] = { action: 'admin_dashboard' };
+        return;
     }
 
-    // طلب بوت
-    if (state.action === 'await_admin_price_time' && txt) return devBot.sendToAdminChannel(ctx, txt, uId, userStates, bot);
-    if (state.action === 'await_bot_desc' && txt) return devBot.askContact(ctx, txt, uId, userStates);
-    if (state.action === 'await_bot_contact' && txt) return devBot.askServer(ctx, txt, uId, userStates);
-    if (state.action === 'await_admin_bot_pricing' && txt) {
-        const clientUserId = state.targetCustomerId;
-        ctx.reply("✅ تم الإرسال!");
-        bot.telegram.sendMessage(clientUserId, `🎉 التكلفة: ${txt}`).catch(() => {});
-        const archiveBtn = Markup.inlineKeyboard([[Markup.button.callback("📂 تسليم الملف", `send_file_now#${clientUserId}`)]]);
-        bot.telegram.sendMessage(config.ADMIN_CHANNEL_ID, `📂 أرشفة طلب (${clientUserId})`, { reply_markup: archiveBtn.reply_markup });
+    // ===== 🔟 حذف قسم =====
+    if (state.action === 'await_delete_category' && txt) {
+        const catName = txt.trim();
+        if (db.custom_store?.games?.[catName]) {
+            delete db.custom_store.games[catName];
+            saveDB();
+            ctx.reply(`🗑️ تم حذف القسم [${catName}] بنجاح!`);
+        } else {
+            ctx.reply(`⚠️ القسم [${catName}] غير موجود!`);
+        }
+        userStates[uId] = { action: 'admin_dashboard' };
+        return;
+    }
+
+    // ===== 1️⃣1️⃣ إضافة منتج =====
+    if (state.action === 'await_add_product' && txt) {
+        const parts = txt.split('|');
+        if (parts.length === 3) {
+            const [category, name, price] = parts.map(p => p.trim());
+            const priceNum = parseFloat(price);
+            if (!isNaN(priceNum) && priceNum > 0 && db.custom_store?.games?.[category]) {
+                db.custom_store.games[category].push(`${name} - ${priceNum.toFixed(2)}`);
+                saveDB();
+                ctx.reply(`✅ تم إضافة المنتج [${name}] بقيمة $${priceNum.toFixed(2)} في قسم [${category}]`);
+            } else {
+                ctx.reply("❌ القسم غير موجود أو السعر غير صحيح!");
+            }
+        } else {
+            ctx.reply("❌ الصيغة غير صحيحة! استخدم: `القسم|اسم_المنتج|السعر`");
+        }
+        userStates[uId] = { action: 'admin_dashboard' };
+        return;
+    }
+
+    // ===== 1️⃣2️⃣ حذف منتج =====
+    if (state.action === 'await_delete_product' && txt) {
+        const parts = txt.split('|');
+        if (parts.length === 2) {
+            const [category, productName] = parts.map(p => p.trim());
+            if (db.custom_store?.games?.[category]) {
+                const index = db.custom_store.games[category].findIndex(item => item.includes(productName));
+                if (index !== -1) {
+                    db.custom_store.games[category].splice(index, 1);
+                    saveDB();
+                    ctx.reply(`🗑️ تم حذف المنتج [${productName}] من قسم [${category}]`);
+                } else {
+                    ctx.reply(`⚠️ المنتج [${productName}] غير موجود في قسم [${category}]`);
+                }
+            } else {
+                ctx.reply(`⚠️ القسم [${category}] غير موجود!`);
+            }
+        } else {
+            ctx.reply("❌ الصيغة غير صحيحة! استخدم: `القسم|اسم_المنتج`");
+        }
+        userStates[uId] = { action: 'admin_dashboard' };
+        return;
+    }
+
+    // ===== 1️⃣3️⃣ استرجاع الأموال =====
+    if (state.action === 'await_refund_amount' && txt) {
+        let amount = 0;
+        let currency = 'usd';
+        if (txt.includes('$')) {
+            amount = parseFloat(txt.replace('$', ''));
+            currency = 'usd';
+        } else if (txt.includes('ل.س')) {
+            const syrAmount = parseFloat(txt.replace('ل.س', ''));
+            amount = syrAmount / (db.exchange_rate || 14500);
+            currency = 'syr';
+        } else {
+            amount = parseFloat(txt);
+            currency = 'usd';
+        }
+        
+        if (isNaN(amount) || amount <= 0) return ctx.reply("❌ اكتب رقماً صحيحاً!");
+        if ((db.users[uId]?.balance_usd || 0) < amount) return ctx.reply(`❌ رصيدك لا يكفي!`);
+        
+        ctx.reply("🚀 تم إرسال طلب الاسترجاع للإدارة!");
+        const btn = Markup.inlineKeyboard([
+            [Markup.button.callback("✅ قبول", `ref_app#${uId}#${amount}`)],
+            [Markup.button.callback("❌ رفض", `ref_rej#${uId}`)]
+        ]);
+        await bot.telegram.sendMessage(config.ADMIN_CHANNEL_ID, 
+            `⚠️ طلب استرجاع: ${ctx.from.first_name} - $${amount.toFixed(2)} (${currency})`, 
+            { reply_markup: btn.reply_markup }
+        ).catch(() => {});
         userStates[uId] = null;
         return;
     }
-    if (state.action === 'await_admin_upload_file' && (ctx.message.document || ctx.message.text)) {
-        const clientUserId = state.targetCustomerId;
-        ctx.reply("🚀 تم التسليم!");
-        if (ctx.message.document) {
-            await bot.telegram.sendDocument(clientUserId, ctx.message.document.file_id, { caption: "🎁 ملف البوت جاهز!" }).catch(() => {});
-        } else {
-            await bot.telegram.sendMessage(clientUserId, `🎁 كود البوت:\n\n\`${txt}\``).catch(() => {});
+
+    // ===== 1️⃣4️⃣ طلب بوت: السعر والوقت =====
+    if (state.action === 'await_admin_price_time' && txt) {
+        const clientId = state.targetCustomerId;
+        if (clientId) {
+            await bot.telegram.sendMessage(clientId, `🎉 **تم قبول طلبك!**\n📝 السعر والوقت: ${txt}`).catch(() => {});
+            ctx.reply(`✅ تم إرسال السعر والوقت للمستخدم ${clientId}`);
         }
         userStates[uId] = null;
         return;
     }
 
-    // شحن رصيد سوري
-    if (state.action === 'await_syr_phone' && txt) {
-        userStates[uId] = { ...state, phoneNumber: txt, action: 'await_syr_amount' };
-        return ctx.reply("💸 اكتب المبلغ:");
-    }
-    if (state.action === 'await_syr_amount' && txt) {
-        const syrAmount = parseFloat(txt);
-        if (isNaN(syrAmount) || syrAmount <= 0) return ctx.reply("❌ اكتب رقماً!");
-        const requiredUsdPrice = (syrAmount * 1.5) / (db.exchange_rate || 14500);
-        if ((db.users[uId]?.balance_usd || 0) < requiredUsdPrice) return ctx.reply(`❌ رصيدك غير كافٍ! المطلوب $${requiredUsdPrice.toFixed(2)}`);
-        userStates[uId] = { type: 'card', item: `شحن ${syrAmount} ل.س`, price: requiredUsdPrice, phoneNumber: state.phoneNumber, action: 'confirmed' };
-        return ctx.reply(`🎯 تأكيد: ${syrAmount} ل.س = $${requiredUsdPrice.toFixed(2)}`, { ...Markup.inlineKeyboard([[Markup.button.callback("✔️ تأكيد", "confirm_order")]]) });
-    }
-
-    // استرجاع أموال
-    if (state.action === 'await_refund_amount' && txt) {
-        const amount = parseFloat(txt);
-        if (isNaN(amount) || amount <= 0) return ctx.reply("❌ اكتب رقماً!");
-        if ((db.users[uId]?.balance_usd || 0) < amount) return ctx.reply(`❌ رصيدك لا يكفي!`);
-        ctx.reply("🚀 تم الإرسال للإدارة!");
-        const btn = Markup.inlineKeyboard([
-            [Markup.button.callback("✅ قبول", `ref_app#${uId}#${amount}`)],
-            [Markup.button.callback("❌ رفض", `ref_rej#${uId}`)]
-        ]);
-        await bot.telegram.sendMessage(config.ADMIN_CHANNEL_ID, `⚠️ طلب استرجاع: ${ctx.from.first_name} - $${amount}`, { reply_markup: btn.reply_markup }).catch(() => {});
-        userStates[uId] = null;
-        return;
-    }
-
-    // معالجة خطوات الشحن
+    // ===== 1️⃣5️⃣ معالجة الشحن =====
     if (state.action && (state.action.startsWith('await_charge') || state.action === 'await_proof')) {
         return charge.handleChargeSteps(ctx, state, uId, userStates, db);
     }
+
+    // ===== 1️⃣6️⃣ أي رسالة غير معروفة =====
+    return ctx.reply("⚠️ لم أفهم طلبك. استخدم الأزرار من القائمة.");
 });
 
 // ==================== التشغيل ====================
