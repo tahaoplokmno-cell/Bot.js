@@ -12,10 +12,10 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
 
     // ===== 1️⃣ أزرار الأدمن =====
     if (data.startsWith("adm#")) {
-        return adminActions.handleAdminCallback(ctx, data, uId, userStates, db);
+        return adminActions.handleAdminCallback(ctx, data, uId, userStates, db, bot);
     }
 
-    // ===== 2️⃣ أزرار المتجر (من shop.js) =====
+    // ===== 2️⃣ أزرار المتجر =====
     if (data.startsWith("shop_cat#") || data.startsWith("buy_item#") || 
         data === "view_games" || data === "view_cards" || 
         data === "m#games" || data === "m#cards" || 
@@ -60,8 +60,10 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         userStates[uId] = null;
         const msg = `✅ **تم الشراء بنجاح!**\n🎁 المنتج: *${state.item}*\n💰 الخصم: *$${state.price}*\n🆔 الآيدي: \`${state.gameId || 'غير محدد'}\``;
         await ctx.editMessageText(msg, { parse_mode: 'Markdown' });
+        
+        // 🔔 إشعار صوتي للأدمن
         await bot.telegram.sendMessage(require('./config').ADMIN_CHANNEL_ID, 
-            `🛒 **طلب شراء جديد:**\n👤 ${ctx.from.first_name}\n🆔 \`${uId}\`\n🎁 ${state.item}\n💰 $${state.price}`
+            `🛒 **طلب شراء جديد!**\n👤 ${ctx.from.first_name}\n🆔 \`${uId}\`\n🎁 ${state.item}\n💰 $${state.price}\n🔔 *رنين*`
         ).catch(() => {});
         return;
     }
@@ -79,6 +81,5 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         });
     }
 
-    // ===== 9️⃣ أي زر آخر غير معروف =====
     return ctx.reply("⚠️ هذا الزر غير مفعل حالياً.");
 };
