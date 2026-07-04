@@ -1,8 +1,8 @@
-
 const { Markup } = require('telegraf');
 const adminActions = require('./admin_actions');
 const charge = require('./charge');
-const shop = require('./shop');  // ✅ أضف هذا السطر
+const shop = require('./shop');
+const devBot = require('./dev_bot');
 
 module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB) {
     const data = ctx.callbackQuery.data;
@@ -10,12 +10,12 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
 
     await ctx.answerCbQuery().catch(() => {});
 
-    // ✅ أزرار الأدمن
+    // ===== 1️⃣ أزرار الأدمن =====
     if (data.startsWith("adm#")) {
         return adminActions.handleAdminCallback(ctx, data, uId, userStates, db);
     }
 
-    // ✅ أزرار المتجر (من shop.js)
+    // ===== 2️⃣ أزرار المتجر (من shop.js) =====
     if (data.startsWith("shop_cat#") || data.startsWith("buy_item#") || 
         data === "view_games" || data === "view_cards" || 
         data === "m#games" || data === "m#cards" || 
@@ -23,17 +23,29 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         return shop.handleShopCallback(ctx, data, uId, userStates, db);
     }
 
-    // ✅ أزرار الشحن
+    // ===== 3️⃣ أزرار إنشاء بوت =====
+    if (data === "bot_order#start" || data.startsWith("bot_order#")) {
+        return devBot.initBotOrder(ctx, userStates, uId);
+    }
+
+    // ===== 4️⃣ أزرار الشحن =====
     if (data.startsWith("ch#")) {
         return charge.askAmount(ctx, data, uId, userStates);
     }
 
-    // ✅ أزرار قبول/رفض الدفع
+    // ===== 5️⃣ أزرار فئات الشحن =====
+    if (data.startsWith("amt#") || data.startsWith("amts#")) {
+        const amount = data.split("#")[1];
+        userStates[uId] = { action: 'await_charge_amount', amount: parseFloat(amount), isUsd: data.startsWith("amt#") };
+        return ctx.reply(`📸 أرسل صورة إثبات الدفع بقيمة ${amount} ${data.startsWith("amt#") ? '$' : 'ل.س'}`);
+    }
+
+    // ===== 6️⃣ أزرار قبول/رفض الدفع =====
     if (data.startsWith("pay_approve#") || data.startsWith("pay_reject#")) {
         return adminActions.handlePaymentDecision(ctx, data, uId, db, saveDB);
     }
 
-    // ✅ تأكيد الطلب
+    // ===== 7️⃣ تأكيد الطلب =====
     if (data === "confirm_order") {
         const state = userStates[uId];
         if (!state || state.action !== 'confirmed') {
@@ -48,17 +60,17 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         userStates[uId] = null;
         const msg = `✅ **تم الشراء بنجاح!**\n🎁 المنتج: *${state.item}*\n💰 الخصم: *$${state.price}*\n🆔 الآيدي: \`${state.gameId || 'غير محدد'}\``;
         await ctx.editMessageText(msg, { parse_mode: 'Markdown' });
-        await bot.telegram.sendMessage(config.ADMIN_CHANNEL_ID, 
+        await bot.telegram.sendMessage(require('./config').ADMIN_CHANNEL_ID, 
             `🛒 **طلب شراء جديد:**\n👤 ${ctx.from.first_name}\n🆔 \`${uId}\`\n🎁 ${state.item}\n💰 $${state.price}`
         ).catch(() => {});
         return;
     }
 
-    // ✅ العودة للقائمة الرئيسية
+    // ===== 8️⃣ العودة للقائمة الرئيسية =====
     if (data === "main_menu") {
         const mainMenu = Markup.keyboard([
             ['🏪 المتجر'],
-            ['💳 شحن الرصيد والمحفظة', '💰 استرجاع الأموال'],
+            ['💳 المحفظة', '💰 استرجاع الأموال'],
             ['⚙️ الإعدادات', '📞 الدعم الفني']
         ]).resize();
         return ctx.editMessageText("🎯 **القائمة الرئيسية**", {
@@ -67,6 +79,6 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         });
     }
 
-    // ✅ أي زر آخر غير معروف
+    // ===== 9️⃣ أي زر آخر غير معروف =====
     return ctx.reply("⚠️ هذا الزر غير مفعل حالياً.");
 };
