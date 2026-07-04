@@ -23,11 +23,11 @@ const openSuperPanel = (ctx) => {
 // ===== إعداد المتجر =====
 db.custom_store = db.custom_store || {};
 db.custom_store.games = db.custom_store.games || {
-    "ببجي موبايل": ["60 شدة - 1.00", "325 شدة - 5.00", "660 شدة - 10.00", "1800 شدة - 25.00"],
-    "فري فاير": ["100 دايموند - 2.00", "200 دايموند - 4.00", "400 دايموند - 7.00"],
-    "روبلوكس": ["100 روبوكس - 1.50", "500 روبوكس - 6.00", "1000 روبوكس - 11.00"],
-    "بطاقات ستيم STEAM": ["فئة 5$ - 5.50", "فئة 10$ - 11.00"],
-    "بطاقات إكس بوكس XBOX": ["فئة 10$ - 10.50", "فئة 25$ - 26.00"]
+    "🎮 ببجي موبايل": ["60 شدة - 1.00$", "325 شدة - 5.00$", "660 شدة - 10.00$", "1800 شدة - 25.00$"],
+    "🎮 فري فاير": ["100 دايموند - 2.00$", "200 دايموند - 4.00$", "400 دايموند - 7.00$"],
+    "🎮 روبلوكس": ["100 روبوكس - 1.50$", "500 روبوكس - 6.00$", "1000 روبوكس - 11.00$"],
+    "🎮 بطاقات ستيم": ["فئة 5$ - 5.50$", "فئة 10$ - 11.00$"],
+    "🎮 بطاقات إكس بوكس": ["فئة 10$ - 10.50$", "فئة 25$ - 26.00$"]
 };
 saveDB();
 
@@ -68,7 +68,7 @@ bot.hears('🤖 إنشاء بوت', ctx => devBot.initBotOrder(ctx, userStates, 
 bot.hears('⚙️ الإعدادات', ctx => settings.showSettings(ctx));
 bot.hears('📞 الدعم الفني', ctx => settings.showSupport(ctx));
 
-// ===== استرجاع الأموال (زرين) =====
+// ===== استرجاع الأموال =====
 bot.hears('💰 استرجاع الأموال', ctx => {
     const btn = Markup.inlineKeyboard([
         [Markup.button.callback("💵 استرجاع بالدولار", "refund#usd")],
@@ -213,7 +213,7 @@ bot.on(['text', 'photo'], async (ctx) => {
             const [category, name, price] = parts.map(p => p.trim());
             const priceNum = parseFloat(price);
             if (!isNaN(priceNum) && priceNum > 0 && db.custom_store?.games?.[category]) {
-                db.custom_store.games[category].push(`${name} - ${priceNum.toFixed(2)}`);
+                db.custom_store.games[category].push(`${name} - ${priceNum.toFixed(2)}$`);
                 saveDB();
                 ctx.reply(`✅ تم إضافة المنتج [${name}] بقيمة $${priceNum.toFixed(2)}`);
             } else {
@@ -297,11 +297,18 @@ bot.on(['text', 'photo'], async (ctx) => {
         return devBot.askContact(ctx, txt, uId, userStates);
     }
 
-    // ===== 1️⃣5️⃣ شحن رصيد سوري =====
+    // ===== 1️⃣5️⃣ طلب بوت: استقبال التواصل =====
+    if (state.action === 'await_bot_contact' && txt) {
+        return devBot.askServer(ctx, txt, uId, userStates);
+    }
+
+    // ===== 1️⃣6️⃣ شحن رصيد سوري (رقم الهاتف) =====
     if (state.action === 'await_syr_phone' && txt) {
         userStates[uId] = { ...state, phoneNumber: txt, action: 'await_syr_amount' };
         return ctx.reply("💸 اكتب المبلغ:");
     }
+
+    // ===== 1️⃣7️⃣ شحن رصيد سوري (المبلغ) =====
     if (state.action === 'await_syr_amount' && txt) {
         const syrAmount = parseFloat(txt);
         if (isNaN(syrAmount) || syrAmount <= 0) return ctx.reply("❌ اكتب رقماً!");
@@ -315,12 +322,12 @@ bot.on(['text', 'photo'], async (ctx) => {
         });
     }
 
-    // ===== 1️⃣6️⃣ معالجة الشحن =====
+    // ===== 1️⃣8️⃣ معالجة الشحن =====
     if (state.action && (state.action.startsWith('await_charge') || state.action === 'await_proof')) {
         return charge.handleChargeSteps(ctx, state, uId, userStates, db);
     }
 
-    // ===== 1️⃣7️⃣ أي رسالة غير معروفة =====
+    // ===== 1️⃣9️⃣ أي رسالة غير معروفة =====
     return ctx.reply("⚠️ لم أفهم طلبك. استخدم الأزرار من القائمة.");
 });
 
