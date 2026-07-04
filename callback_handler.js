@@ -11,21 +11,20 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
 
     await ctx.answerCbQuery().catch(() => {});
 
-    // ===== 1️⃣ أزرار الأدمن الخارقة =====
+    // ===== 1️⃣ أزرار الأدمن =====
     if (data.startsWith("adm#")) {
         return adminActions.handleSuperAdminCallback(ctx, data, uId, userStates, db, bot);
     }
 
     // ===== 2️⃣ أزرار المتجر =====
     if (data.startsWith("shop_cat#") || data.startsWith("buy_item#") ||
-        data === "view_games" || data === "view_cards" ||
         data === "m#games" || data === "m#cards" || data === "m#phone" ||
         data.startsWith("order_syr_card#")) {
         return shop.handleShopCallback(ctx, data, uId, userStates, db);
     }
 
     // ===== 3️⃣ أزرار إنشاء بوت =====
-    if (data === "bot_order#start" || data.startsWith("bot_order#")) {
+    if (data === "bot_order#start") {
         return devBot.initBotOrder(ctx, userStates, uId);
     }
 
@@ -60,7 +59,7 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
                 await bot.telegram.sendMessage(targetId, `✅ تم استرجاع $${amount} إلى محفظتك!`);
             }
         } else {
-            await ctx.editMessageText(`❌ تم رفض طلب الاسترجاع للمستخدم ${targetId}`);
+            await ctx.editMessageText(`❌ تم رفض طلب الاسترجاع`);
             await bot.telegram.sendMessage(targetId, "❌ عذراً، تم رفض طلب استرجاع الأموال.");
         }
         return;
@@ -78,11 +77,11 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         const clientId = parts[2];
 
         if (action === "approve") {
-            userStates[clientId] = { action: 'await_admin_price_time', targetCustomerId: clientId };
-            await ctx.editMessageText(`✅ تم قبول طلب البوت للمستخدم ${clientId}\n✍️ اكتب السعر والوقت المقدر:`);
+            userStates[uId] = { action: 'await_admin_price_time', targetCustomerId: clientId };
+            await ctx.editMessageText(`✅ تم قبول طلب البوت\n✍️ اكتب السعر والوقت:`);
         } else {
-            await ctx.editMessageText(`❌ تم رفض طلب البوت للمستخدم ${clientId}`);
-            await bot.telegram.sendMessage(clientId, "❌ عذراً، تم رفض طلب إنشاء البوت الخاص بك.");
+            await ctx.editMessageText(`❌ تم رفض طلب البوت`);
+            await bot.telegram.sendMessage(clientId, "❌ عذراً، تم رفض طلبك.");
         }
         return;
     }
@@ -100,7 +99,7 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         db.users[uId].balance_usd = userBal - state.price;
         saveDB(db);
         userStates[uId] = null;
-        const msg = `✅ **تم الشراء بنجاح!**\n🎁 المنتج: *${state.item}*\n💰 الخصم: *$${state.price}*\n🆔 الآيدي: \`${state.gameId || 'غير محدد'}\``;
+        const msg = `✅ **تم الشراء بنجاح!**\n🎁 المنتج: *${state.item}*\n💰 الخصم: *$${state.price}*`;
         await ctx.editMessageText(msg, { parse_mode: 'Markdown' });
         await bot.telegram.sendMessage(config.ADMIN_CHANNEL_ID,
             `🛒 **طلب شراء جديد!**\n👤 ${ctx.from.first_name}\n🆔 \`${uId}\`\n🎁 ${state.item}\n💰 $${state.price}`
