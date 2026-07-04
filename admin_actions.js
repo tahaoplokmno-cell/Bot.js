@@ -1,21 +1,9 @@
 const { Markup } = require('telegraf');
+const adminPanel = require('./admin'); // استيراد لوحة الأدمن
 
 // ===== عرض لوحة الأدمن =====
 function getAdminPanel(db) {
-    const usersCount = db.users ? Object.keys(db.users).length : 0;
-    const totalBalance = db.users ? Object.values(db.users).reduce((sum, u) => sum + (u.balance_usd || 0), 0) : 0;
-
-    return {
-        text: `🔐 **لوحة التحكم الإدارية**\n━━━━━━━━━━━━━━━━━━━━\n👥 عدد المستخدمين: *${usersCount}*\n💰 إجمالي الأرصدة: *$${totalBalance.toFixed(2)}*\n━━━━━━━━━━━━━━━━━━━━\n📌 اختر خياراً:`,
-        markup: Markup.inlineKeyboard([
-            [Markup.button.callback("📊 الإحصائيات", "adm#stats")],
-            [Markup.button.callback("📢 إرسال إعلان", "adm#broadcast")],
-            [Markup.button.callback("💳 إدارة المحفظة", "adm#wallet")],
-            [Markup.button.callback("📱 شحن سام كاش", "adm#sham")],
-            [Markup.button.callback("💰 استرجاع الأموال", "adm#refund")],
-            [Markup.button.callback("🔙 العودة للقائمة", "main_menu")]
-        ])
-    };
+    return adminPanel.getAdminPanel(db);
 }
 
 // ===== معالجة أزرار الأدمن =====
@@ -23,54 +11,99 @@ async function handleAdminCallback(ctx, data, uId, userStates, db, bot) {
     const parts = data.split("#");
     const action = parts[1];
 
-    // 1️⃣ الإحصائيات
-    if (action === "stats") {
-        const usersCount = db.users ? Object.keys(db.users).length : 0;
-        const totalBalance = db.users ? Object.values(db.users).reduce((sum, u) => sum + (u.balance_usd || 0), 0) : 0;
-        return ctx.editMessageText(
-            `📊 **الإحصائيات:**\n👥 المستخدمين: *${usersCount}*\n💰 إجمالي الرصيد: *$${totalBalance.toFixed(2)}*`,
-            { parse_mode: 'Markdown' }
-        );
+    // 1️⃣ تعديل الملاحظات
+    if (action === "edit_notes") {
+        userStates[uId] = { action: 'await_new_notes' };
+        return ctx.editMessageText("✍️ اكتب الملاحظة الجديدة التي تريد حفظها:");
     }
 
-    // 2️⃣ إرسال إعلان
-    if (action === "broadcast") {
-        userStates[uId] = { action: 'await_broadcast_txt' };
-        return ctx.editMessageText("✍️ اكتب الرسالة التي تريد إرسالها لجميع المستخدمين:");
+    // 2️⃣ تعديل سعر الصرف
+    if (action === "edit_rate") {
+        userStates[uId] = { action: 'await_new_rate' };
+        return ctx.editMessageText("✍️ اكتب سعر الصرف الجديد (مثال: 15000):");
     }
 
-    // 3️⃣ إدارة المحفظة
-    if (action === "wallet") {
-        return ctx.editMessageText("💳 **إدارة المحفظة:**\nاختر خياراً:",
-            Markup.inlineKeyboard([
-                [Markup.button.callback("💰 إهداء رصيد", "adm#gift")],
-                [Markup.button.callback("📊 عرض رصيد مستخدم", "adm#view_balance")]
-            ])
-        );
-    }
-
-    // 4️⃣ إهداء رصيد - الخطوة الأولى
-    if (action === "gift") {
+    // 3️⃣ شحن رصيد يدوياً (إهداء)
+    if (action === "gift_user") {
         userStates[uId] = { action: 'await_gift_uid' };
-        return ctx.editMessageText("✍️ اكتب آيدي المستخدم الذي تريد إهداءه:");
+        return ctx.editMessageText("✍️ اكتب آيدي المستخدم الذي تريد شحنه:");
     }
 
-    // 5️⃣ شحن سام كاش
-    if (action === "sham") {
-        userStates[uId] = { action: 'await_sham_amount' };
-        return ctx.editMessageText("✍️ اكتب المبلغ الذي تريد شحنه عبر سام كاش (بالدولار):");
+    // 4️⃣ بث رسالة
+    if (action === "pin_msg") {
+        userStates[uId] = { action: 'await_broadcast_pin' };
+        return ctx.editMessageText("✍️ اكتب الرسالة التي تريد بثها وتثبيتها:");
     }
 
-    // 6️⃣ استرجاع الأموال
-    if (action === "refund") {
-        userStates[uId] = { action: 'await_refund_amount' };
-        return ctx.editMessageText("✍️ اكتب المبلغ الذي تريد استرجاعه (بالدولار):");
+    // 5️⃣ حظر مستخدم
+    if (action === "ban_user") {
+        userStates[uId] = { action: 'await_ban_uid' };
+        return ctx.editMessageText("✍️ اكتب آيدي المستخدم الذي تريد حظره:");
     }
 
-    // 7️⃣ عرض رصيد مستخدم
-    if (action === "view_balance") {
-        userStates[uId] = { action: 'await_view_balance_uid' };
-        return ctx.editMessageText("✍️ اكتب آيدي المستخدم لعرض رصيده:");
+    // 6️⃣ فك الحظر
+    if (action === "unban_user") {
+        userStates[uId] = { action: 'await_unban_uid' };
+        return ctx.editMessageText("✍️ اكتب آيدي المستخدم الذي تريد فك حظره:");
+    }
+
+    // 7️⃣ تشغيل/إيقاف الصيانة
+    if (action === "toggle_bot") {
+        db.bot_maintenance = !db.bot_maintenance;
+        require('./database').saveDB(db);
+        return ctx.editMessageText(`✅ تم ${db.bot_maintenance ? 'تفعيل' : 'إيقاف'} وضع الصيانة.`);
+    }
+
+    // 8️⃣ إضافة قسم جديد
+    if (action === "add_cat") {
+        userStates[uId] = { action: 'await_add_cat' };
+        return ctx.editMessageText("✍️ اكتب اسم القسم الجديد (مثال: كود فري فاير):");
+    }
+
+    // 9️⃣ إضافة عرض جديد
+    if (action === "add_offer") {
+        userStates[uId] = { action: 'await_add_offer' };
+        return ctx.editMessageText("✍️ اكتب العرض الجديد بالصيغة: `اسم_القسم|اسم_العرض|السعر` (مثال: ببجي موبايل|شدة 60|1.00)");
+    }
+
+    // 🔟 حذف قسم
+    if (action === "del_offer") {
+        userStates[uId] = { action: 'await_del_offer' };
+        return ctx.editMessageText("✍️ اكتب اسم القسم الذي تريد حذفه بالكامل:");
+    }
+
+    // 1️⃣1️⃣ تصفير الأرصدة
+    if (action === "zero_balance") {
+        if (db.users) {
+            Object.keys(db.users).forEach(id => { db.users[id].balance_usd = 0; });
+            require('./database').saveDB(db);
+        }
+        return ctx.editMessageText("✅ تم تصفير جميع الأرصدة بنجاح.");
+    }
+
+    // 1️⃣2️⃣ سحب قاعدة البيانات
+    if (action === "get_backup") {
+        const dbFile = require('./database');
+        const backup = dbFile.loadDB();
+        const json = JSON.stringify(backup, null, 2);
+        // إرسال الملف كـ Document
+        await ctx.replyWithDocument({
+            source: Buffer.from(json, 'utf8'),
+            filename: `backup_${Date.now()}.json`
+        });
+        return ctx.editMessageText("✅ تم إرسال نسخة احتياطية من قاعدة البيانات.");
+    }
+
+    // 1️⃣3️⃣ إغلاق لوحة التحكم
+    if (action === "close_panel") {
+        userStates[uId] = { action: 'admin_dashboard' };
+        return ctx.editMessageText("🔒 تم إغلاق لوحة التحكم. اكتب /panel لإعادة فتحها.");
+    }
+
+    // 1️⃣4️⃣ معالجة إضافة قسم (من text_handler)
+    if (action === "add_cat_confirm") {
+        // تتم في text_handler
+        return ctx.reply("✅ جاري المعالجة...");
     }
 
     return ctx.reply("🔐 هذا زر خاص بالأدمن.");
