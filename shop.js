@@ -4,8 +4,10 @@ const dbFile = require('./database');
 function handleShopCallback(ctx, data, uId, userStates, db) {
     const backToMain = [Markup.button.callback("🔙 العودة للقائمة الرئيسية", "main_menu")];
     
+    // ===== التأكد من وجود custom_store =====
     if (!db.custom_store) db.custom_store = { games: {} };
     
+    // ===== إذا كانت الألعاب فارغة، أعد تهيئتها =====
     if (Object.keys(db.custom_store.games).length === 0) {
         db.custom_store.games = {
             "🎮 ببجي موبايل": ["60 شدة - 1.00$", "325 شدة - 5.00$", "660 شدة - 10.00$", "1800 شدة - 25.00$"],
@@ -17,6 +19,7 @@ function handleShopCallback(ctx, data, uId, userStates, db) {
         dbFile.saveDB(db);
     }
 
+    // ===== عرض الألعاب =====
     if (data === "m#games") {
         const games = db.custom_store.games || {};
         const keys = Object.keys(games);
@@ -29,6 +32,7 @@ function handleShopCallback(ctx, data, uId, userStates, db) {
         });
     }
 
+    // ===== عرض منتجات القسم =====
     if (data.startsWith("shop_cat#")) {
         const catName = data.split('#')[1];
         const list = db.custom_store.games[catName] || [];
@@ -46,6 +50,7 @@ function handleShopCallback(ctx, data, uId, userStates, db) {
         });
     }
 
+    // ===== شراء منتج =====
     if (data.startsWith("buy_item#")) {
         const parts = data.split('#');
         const catName = parts[1];
@@ -65,6 +70,7 @@ function handleShopCallback(ctx, data, uId, userStates, db) {
         return ctx.reply(`✍️ اكتب الآيدي (ID) الخاص بك:`, { parse_mode: 'Markdown' });
     }
 
+    // ===== باقي الأزرار =====
     if (data === "m#cards") {
         const buttons = [
             [Markup.button.callback("🎮 بطاقات ستيم", "shop_cat#🎮 بطاقات ستيم")],
