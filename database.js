@@ -30,11 +30,20 @@ function loadDB() {
 
         let data = JSON.parse(raw);
         
-        // تأمين القوائم الأساسية لكي لا تتصفر
+        // ===== تأمين القوائم الأساسية =====
         if (!data.users) data.users = {};
         if (!data.banned) data.banned = {};
         if (!data.muted) data.muted = {};
         if (!data.exchange_rate) data.exchange_rate = 14500;
+        if (!data.admin_notes) data.admin_notes = "";
+        if (data.bot_maintenance === undefined) data.bot_maintenance = false;
+        if (!data.custom_store) data.custom_store = { games: {} };
+        
+        // ===== الحقول الجديدة للوحة الخارقة =====
+        if (!data.orders) data.orders = [];
+        if (!data.bot_orders) data.bot_orders = [];
+        if (!data.installments) data.installments = [];
+        if (!data.products) data.products = [];
         
         return data;
 
@@ -53,14 +62,36 @@ function loadDB() {
             console.error("❌ حتى النسخة الاحتياطية تالفة أو غير موجودة:", backupError);
         }
 
-        // إذا دمرت كل الملفات تماماً (حالة نادرة جداً)، نرجع البنية الأساسية
-        return { users: {}, banned: {}, muted: {}, exchange_rate: 14500 };
+        // إذا دمرت كل الملفات تماماً (حالة نادرة جداً)، نرجع البنية الأساسية مع الحقول الجديدة
+        return { 
+            users: {}, 
+            banned: {}, 
+            muted: {}, 
+            exchange_rate: 14500,
+            admin_notes: "",
+            bot_maintenance: false,
+            custom_store: { games: {} },
+            orders: [],
+            bot_orders: [],
+            installments: [],
+            products: []
+        };
     }
 }
 
 function saveDB(d) {
     try {
         if (!d || typeof d !== 'object' || !d.users) return;
+        
+        // ===== التأكد من وجود جميع الحقول الجديدة قبل الحفظ =====
+        if (!d.orders) d.orders = [];
+        if (!d.bot_orders) d.bot_orders = [];
+        if (!d.installments) d.installments = [];
+        if (!d.products) d.products = [];
+        if (!d.custom_store) d.custom_store = { games: {} };
+        if (d.bot_maintenance === undefined) d.bot_maintenance = false;
+        if (!d.admin_notes) d.admin_notes = "";
+        
         const rawData = JSON.stringify(d, null, 4);
         
         // الحفظ في الملف الحقيقي وفي الباك أب في نفس اللحظة للحماية القصوى
