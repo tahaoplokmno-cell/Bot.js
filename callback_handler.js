@@ -19,7 +19,7 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
     // ===== 2️⃣ أزرار المتجر =====
     if (data.startsWith("shop_cat#") || data.startsWith("buy_item#") ||
         data === "m#games" || data === "m#cards" || data === "m#phone" ||
-        data.startsWith("order_syr_card#")) {
+        data.startsWith("order_syr#")) {
         return shop.handleShopCallback(ctx, data, uId, userStates, db);
     }
 
@@ -33,19 +33,19 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         return charge.askAmount(ctx, data, uId, userStates);
     }
 
-    // ===== 5️⃣ أزرار فئات الشحن =====
+    // ===== 5️⃣ فئات الشحن =====
     if (data.startsWith("amt#") || data.startsWith("amts#")) {
         const amount = data.split("#")[1];
         userStates[uId] = { action: 'await_charge_amount', amount: parseFloat(amount), isUsd: data.startsWith("amt#") };
         return ctx.reply(`📸 أرسل صورة إثبات الدفع بقيمة ${amount} ${data.startsWith("amt#") ? '$' : 'ل.س'}`);
     }
 
-    // ===== 6️⃣ أزرار قبول/رفض الدفع =====
+    // ===== 6️⃣ قبول/رفض الدفع =====
     if (data.startsWith("pay_approve#") || data.startsWith("pay_reject#")) {
         return adminActions.handlePaymentDecision(ctx, data, uId, db, saveDB);
     }
 
-    // ===== 7️⃣ أزرار استرجاع الأموال =====
+    // ===== 7️⃣ استرجاع الأموال =====
     if (data.startsWith("ref_app#") || data.startsWith("ref_rej#")) {
         const parts = data.split("#");
         const targetId = parts[1];
@@ -65,12 +65,20 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         return;
     }
 
-    // ===== 8️⃣ أزرار السيرفر (إنشاء بوت) =====
+    // ===== 8️⃣ اختيار عملة الاسترجاع =====
+    if (data.startsWith("refund#")) {
+        const currency = data.split("#")[1];
+        userStates[uId] = { action: 'await_refund_amount', currency };
+        const msg = currency === 'usd' ? "✍️ اكتب المبلغ بالدولار:" : "✍️ اكتب المبلغ بالليرة السورية:";
+        return ctx.reply(msg);
+    }
+
+    // ===== 9️⃣ السيرفر (إنشاء بوت) =====
     if (data.startsWith("srv#")) {
         return devBot.handleServerChoice(ctx, data, uId, userStates, bot);
     }
 
-    // ===== 9️⃣ أزرار قبول/رفض طلب البوت =====
+    // ===== 🔟 قبول/رفض طلب البوت =====
     if (data.startsWith("bot_dec#")) {
         const parts = data.split("#");
         const action = parts[1];
@@ -86,7 +94,7 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         return;
     }
 
-    // ===== 🔟 تأكيد الطلب =====
+    // ===== 1️⃣1️⃣ تأكيد الطلب =====
     if (data === "confirm_order") {
         const state = userStates[uId];
         if (!state || state.action !== 'confirmed') {
@@ -107,7 +115,7 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         return;
     }
 
-    // ===== 1️⃣1️⃣ العودة للقائمة الرئيسية =====
+    // ===== 1️⃣2️⃣ العودة للقائمة =====
     if (data === "main_menu") {
         const mainMenu = Markup.keyboard([
             ['🏪 المتجر'],
