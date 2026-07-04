@@ -15,7 +15,7 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         return adminActions.handleAdminCallback(ctx, data, uId, userStates, db, bot);
     }
 
-    // ===== 2️⃣ أزرار المتجر =====
+    // ===== 2️⃣ أزرار المتجر (من shop.js) =====
     if (data.startsWith("shop_cat#") || data.startsWith("buy_item#") || 
         data === "view_games" || data === "view_cards" || 
         data === "m#games" || data === "m#cards" || 
@@ -79,5 +79,6 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         });
     }
 
+    // ===== 9️⃣ أي زر آخر غير معروف =====
     return ctx.reply("⚠️ هذا الزر غير مفعل حالياً.");
 };
