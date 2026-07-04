@@ -67,9 +67,14 @@ bot.hears('💳 المحفظة', ctx => charge.initCharge(ctx, userStates, Strin
 bot.hears('🤖 إنشاء بوت', ctx => devBot.initBotOrder(ctx, userStates, String(ctx.chat.id)));
 bot.hears('⚙️ الإعدادات', ctx => settings.showSettings(ctx));
 bot.hears('📞 الدعم الفني', ctx => settings.showSupport(ctx));
+
+// ===== استرجاع الأموال (زرين دولار + ليرة) =====
 bot.hears('💰 استرجاع الأموال', ctx => {
-    userStates[String(ctx.chat.id)] = { action: 'await_refund_amount' };
-    ctx.reply("✍️ اكتب المبلغ بالدولار أو بالليرة (مثال: 10$ أو 15000 ل.س):");
+    const btn = Markup.inlineKeyboard([
+        [Markup.button.callback("💵 استرجاع بالدولار", "refund#usd")],
+        [Markup.button.callback("🇸🇾 استرجاع بالليرة", "refund#syr")]
+    ]);
+    ctx.reply("💰 **اختر عملة الاسترجاع:**", btn);
 });
 
 // ==================== الكولباك ====================
@@ -82,7 +87,7 @@ bot.on('callback_query', async (ctx) => {
     }
 });
 
-// ==================== الرسائل النصية (المعالج الكامل) ====================
+// ==================== الرسائل النصية ====================
 bot.on(['text', 'photo'], async (ctx) => {
     const uId = String(ctx.chat.id);
     const state = userStates[uId];
@@ -121,13 +126,11 @@ bot.on(['text', 'photo'], async (ctx) => {
         return;
     }
 
-    // ===== 4️⃣ إهداء رصيد (الخطوة 1) =====
+    // ===== 4️⃣ إهداء رصيد =====
     if (state.action === 'await_gift_uid' && txt) {
         userStates[uId] = { action: 'await_gift_amount', targetUid: txt };
         return ctx.reply("💰 اكتب المبلغ بالدولار:");
     }
-    
-    // ===== 5️⃣ إهداء رصيد (الخطوة 2) =====
     if (state.action === 'await_gift_amount' && txt) {
         const amt = parseFloat(txt);
         if (!isNaN(amt) && amt > 0 && db.users?.[state.targetUid]) {
@@ -142,7 +145,7 @@ bot.on(['text', 'photo'], async (ctx) => {
         return;
     }
 
-    // ===== 6️⃣ حظر مستخدم =====
+    // ===== 5️⃣ حظر =====
     if (state.action === 'await_ban_uid' && txt) {
         db.banned = db.banned || {};
         db.banned[txt] = true;
@@ -151,7 +154,7 @@ bot.on(['text', 'photo'], async (ctx) => {
         return ctx.reply(`🚫 تم حظر [${txt}].`);
     }
 
-    // ===== 7️⃣ فك الحظر =====
+    // ===== 6️⃣ فك الحظر =====
     if (state.action === 'await_unban_uid' && txt) {
         if (db.banned) delete db.banned[txt];
         saveDB();
@@ -159,7 +162,7 @@ bot.on(['text', 'photo'], async (ctx) => {
         return ctx.reply(`🟢 تم فك حظر [${txt}].`);
     }
 
-    // ===== 8️⃣ إرسال إعلان =====
+    // ===== 7️⃣ إرسال إعلان =====
     if (state.action === 'await_broadcast_pin' && txt) {
         userStates[uId] = { action: 'admin_dashboard' };
         ctx.reply("🚀 جاري الإرسال...");
@@ -174,7 +177,7 @@ bot.on(['text', 'photo'], async (ctx) => {
         return;
     }
 
-    // ===== 9️⃣ إضافة قسم =====
+    // ===== 8️⃣ إضافة قسم =====
     if (state.action === 'await_add_category' && txt) {
         const catName = txt.trim();
         if (!db.custom_store) db.custom_store = { games: {} };
@@ -189,7 +192,7 @@ bot.on(['text', 'photo'], async (ctx) => {
         return;
     }
 
-    // ===== 🔟 حذف قسم =====
+    // ===== 9️⃣ حذف قسم =====
     if (state.action === 'await_delete_category' && txt) {
         const catName = txt.trim();
         if (db.custom_store?.games?.[catName]) {
@@ -203,7 +206,7 @@ bot.on(['text', 'photo'], async (ctx) => {
         return;
     }
 
-    // ===== 1️⃣1️⃣ إضافة منتج =====
+    // ===== 🔟 إضافة منتج =====
     if (state.action === 'await_add_product' && txt) {
         const parts = txt.split('|');
         if (parts.length === 3) {
@@ -223,7 +226,7 @@ bot.on(['text', 'photo'], async (ctx) => {
         return;
     }
 
-    // ===== 1️⃣2️⃣ حذف منتج =====
+    // ===== 1️⃣1️⃣ حذف منتج =====
     if (state.action === 'await_delete_product' && txt) {
         const parts = txt.split('|');
         if (parts.length === 2) {
@@ -247,24 +250,23 @@ bot.on(['text', 'photo'], async (ctx) => {
         return;
     }
 
-    // ===== 1️⃣3️⃣ استرجاع الأموال =====
+    // ===== 1️⃣2️⃣ استرجاع الأموال =====
     if (state.action === 'await_refund_amount' && txt) {
         let amount = 0;
-        let currency = 'usd';
-        if (txt.includes('$')) {
-            amount = parseFloat(txt.replace('$', ''));
-            currency = 'usd';
-        } else if (txt.includes('ل.س')) {
-            const syrAmount = parseFloat(txt.replace('ل.س', ''));
-            amount = syrAmount / (db.exchange_rate || 14500);
-            currency = 'syr';
-        } else {
+        let currency = state.currency || 'usd';
+        
+        if (currency === 'usd') {
             amount = parseFloat(txt);
-            currency = 'usd';
+            if (isNaN(amount) || amount <= 0) return ctx.reply("❌ اكتب رقماً صحيحاً بالدولار!");
+        } else {
+            const syrAmount = parseFloat(txt);
+            if (isNaN(syrAmount) || syrAmount <= 0) return ctx.reply("❌ اكتب رقماً صحيحاً بالليرة!");
+            amount = syrAmount / (db.exchange_rate || 14500);
         }
         
-        if (isNaN(amount) || amount <= 0) return ctx.reply("❌ اكتب رقماً صحيحاً!");
-        if ((db.users[uId]?.balance_usd || 0) < amount) return ctx.reply(`❌ رصيدك لا يكفي!`);
+        if ((db.users[uId]?.balance_usd || 0) < amount) {
+            return ctx.reply(`❌ رصيدك لا يكفي!`);
+        }
         
         ctx.reply("🚀 تم إرسال طلب الاسترجاع للإدارة!");
         const btn = Markup.inlineKeyboard([
@@ -279,7 +281,7 @@ bot.on(['text', 'photo'], async (ctx) => {
         return;
     }
 
-    // ===== 1️⃣4️⃣ طلب بوت: السعر والوقت =====
+    // ===== 1️⃣3️⃣ طلب بوت: السعر والوقت =====
     if (state.action === 'await_admin_price_time' && txt) {
         const clientId = state.targetCustomerId;
         if (clientId) {
@@ -288,6 +290,24 @@ bot.on(['text', 'photo'], async (ctx) => {
         }
         userStates[uId] = null;
         return;
+    }
+
+    // ===== 1️⃣4️⃣ شحن رصيد سوري =====
+    if (state.action === 'await_syr_phone' && txt) {
+        userStates[uId] = { ...state, phoneNumber: txt, action: 'await_syr_amount' };
+        return ctx.reply("💸 اكتب المبلغ:");
+    }
+    if (state.action === 'await_syr_amount' && txt) {
+        const syrAmount = parseFloat(txt);
+        if (isNaN(syrAmount) || syrAmount <= 0) return ctx.reply("❌ اكتب رقماً!");
+        const requiredUsdPrice = (syrAmount * 1.5) / (db.exchange_rate || 14500);
+        if ((db.users[uId]?.balance_usd || 0) < requiredUsdPrice) {
+            return ctx.reply(`❌ رصيدك غير كافٍ! المطلوب $${requiredUsdPrice.toFixed(2)}`);
+        }
+        userStates[uId] = { type: 'card', item: `شحن ${syrAmount} ل.س`, price: requiredUsdPrice, phoneNumber: state.phoneNumber, action: 'confirmed' };
+        return ctx.reply(`🎯 تأكيد: ${syrAmount} ل.س = $${requiredUsdPrice.toFixed(2)}`, { 
+            ...Markup.inlineKeyboard([[Markup.button.callback("✔️ تأكيد", "confirm_order")]]) 
+        });
     }
 
     // ===== 1️⃣5️⃣ معالجة الشحن =====
