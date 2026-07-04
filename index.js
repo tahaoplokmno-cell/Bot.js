@@ -5,7 +5,6 @@ const shop = require('./shop');
 const charge = require('./charge');
 const devBot = require('./dev_bot');
 const settings = require('./settings');
-const admin = require('./admin');
 const adminActions = require('./admin_actions');
 const dbFile = require('./database');
 const callbackHandler = require('./callback_handler');
@@ -21,7 +20,7 @@ const openPanel = (ctx) => {
     return ctx.reply(p.text, { parse_mode: 'Markdown', ...p.markup });
 };
 
-// ===== إعدادات المتجر =====
+// ===== إعداد المتجر الافتراضي =====
 db.custom_store = db.custom_store || {};
 db.custom_store.games = db.custom_store.games || {
     "ببجي موبايل": ["60 شدة - 1.00", "325 شدة - 5.00", "660 شدة - 10.00", "1800 شدة - 25.00"],
@@ -33,10 +32,9 @@ db.custom_store.games = db.custom_store.games || {
 saveDB();
 
 // ==================== الأوامر ====================
-
 bot.command('admin', ctx => {
     userStates[String(ctx.chat.id)] = { action: 'await_password' };
-    ctx.reply("🔐 اكتب كلمة السر الملكية للتحقق:");
+    ctx.reply("🔐 اكتب كلمة السر:");
 });
 
 bot.command('panel', ctx => {
@@ -44,7 +42,7 @@ bot.command('panel', ctx => {
     if (userStates[uId]?.action === 'admin_dashboard' || uId === "8243108672") {
         return openPanel(ctx);
     }
-    ctx.reply("❌ ليس لديك صلاحية أدمن.");
+    ctx.reply("❌ ليس لديك صلاحية.");
 });
 
 bot.start(async (ctx) => {
@@ -52,65 +50,56 @@ bot.start(async (ctx) => {
     if (!db.users) db.users = {};
     if (db.banned?.[uId]) return ctx.reply("🚫 أنت محظور.");
     if (!db.users[uId]) {
-        db.users[uId] = { name: ctx.from.first_name, balance_usd: 0.0 };
+        db.users[uId] = { name: ctx.from.first_name, balance_usd: 0 };
         saveDB();
     }
     const rate = db.exchange_rate || 14500;
     const usd = db.users[uId].balance_usd || 0;
     ctx.reply(
-        `👑 **بوت شام إن جيم | SHAM IN GAME** 👑\n━━━━━━━━━━━━━━━━━━━━\n👤 **مرحباً بك:** ${ctx.from.first_name}\n💰 **رصيدك:** $${usd.toFixed(2)} | ${(usd * rate).toLocaleString()} ل.س\n📈 **سعر الصرف:** 1$ = ${rate.toLocaleString()} ل.س\n━━━━━━━━━━━━━━━━━━━━\n⚠️ يمكنك الشحن والشراء عبر الأزرار! ❤️`,
+        `👑 **بوت شام إن جيم** 👑\n━━━━━━━━━━━━━━━━━━━━\n👤 مرحباً: ${ctx.from.first_name}\n💰 رصيدك: $${usd.toFixed(2)} | ${(usd * rate).toLocaleString()} ل.س\n📈 سعر الصرف: 1$ = ${rate.toLocaleString()} ل.س`,
         { parse_mode: 'Markdown', ...menus.mainMenu }
     );
 });
 
 // ==================== الأزرار النصية ====================
-
-bot.hears('🏪 المتجر', ctx => {
-    if (db.bot_maintenance && String(ctx.chat.id) !== "8243108672") {
-        return ctx.reply("🛑 البوت في وضع الصيانة حالياً.");
-    }
-    ctx.reply("🛍️ اختر القسم:", menus.storeMenu);
-});
-
+bot.hears('🛒 المتجر', ctx => ctx.reply("🛍️ اختر القسم:", menus.storeMenu));
 bot.hears('💳 المحفظة', ctx => charge.initCharge(ctx, userStates, String(ctx.chat.id), db));
 bot.hears('🤖 إنشاء بوت', ctx => devBot.initBotOrder(ctx, userStates, String(ctx.chat.id)));
 bot.hears('⚙️ الإعدادات', ctx => settings.showSettings(ctx));
 bot.hears('📞 الدعم الفني', ctx => settings.showSupport(ctx));
 bot.hears('💰 استرجاع الأموال', ctx => {
     userStates[String(ctx.chat.id)] = { action: 'await_refund_amount' };
-    ctx.reply("✍️ اكتب المبلغ بالدولار المراد استرجاعه:");
+    ctx.reply("✍️ اكتب المبلغ بالدولار:");
 });
 
-// ==================== معالجة الكولباك ====================
-
+// ==================== الكولباك ====================
 bot.on('callback_query', async (ctx) => {
     try {
         await callbackHandler(ctx, bot, db, userStates, saveDB);
     } catch (err) {
-        console.error('❌ خطأ في الكولباك:', err);
-        await ctx.reply('⚠️ حدث خطأ، حاول مرة أخرى.').catch(() => {});
+        console.error('❌ خطأ:', err);
+        await ctx.reply('⚠️ حدث خطأ.').catch(() => {});
     }
 });
 
-// ==================== معالجة الرسائل النصية ====================
-
+// ==================== الرسائل النصية ====================
 bot.on(['text', 'photo'], async (ctx) => {
     const uId = String(ctx.chat.id);
     const state = userStates[uId];
     const txt = ctx.message.text;
     if (!state) return;
 
-    // ===== كلمة السر =====
+    // كلمة السر
     if (state.action === 'await_password') {
         if (txt === config.ADMIN_PASSWORD) {
             userStates[uId] = { action: 'admin_dashboard' };
             return ctx.reply("✅ تم التحقق! اكتب /panel.");
         }
         userStates[uId] = null;
-        return ctx.reply("❌ كلمة السر خاطئة!");
+        return ctx.reply("❌ كلمة سر خاطئة!");
     }
 
-    // ===== ملاحظات الأدمن =====
+    // ملاحظات الأدمن
     if (state.action === 'await_new_notes' && txt) {
         db.admin_notes = txt;
         saveDB();
@@ -118,7 +107,7 @@ bot.on(['text', 'photo'], async (ctx) => {
         return ctx.reply("✅ تم الحفظ!");
     }
 
-    // ===== تعديل سعر الصرف =====
+    // تعديل سعر الصرف
     if (state.action === 'await_new_rate' && txt) {
         const r = parseFloat(txt);
         if (!isNaN(r)) { db.exchange_rate = r; saveDB(); ctx.reply("✅ تم التعديل!"); }
@@ -126,7 +115,7 @@ bot.on(['text', 'photo'], async (ctx) => {
         return;
     }
 
-    // ===== إهداء رصيد =====
+    // إهداء رصيد
     if (state.action === 'await_gift_uid' && txt) {
         userStates[uId] = { action: 'await_gift_amount', targetUid: txt };
         return ctx.reply("💰 اكتب المبلغ:");
@@ -143,7 +132,7 @@ bot.on(['text', 'photo'], async (ctx) => {
         return;
     }
 
-    // ===== حظر / فك حظر =====
+    // حظر / فك حظر
     if (state.action === 'await_ban_uid' && txt) {
         db.banned = db.banned || {};
         db.banned[txt] = true;
@@ -155,10 +144,10 @@ bot.on(['text', 'photo'], async (ctx) => {
         if (db.banned) delete db.banned[txt];
         saveDB();
         userStates[uId] = { action: 'admin_dashboard' };
-        return ctx.reply(`🟢 تم فك الحظر عن [${txt}].`);
+        return ctx.reply(`🟢 تم فك حظر [${txt}].`);
     }
 
-    // ===== إرسال إعلان =====
+    // إرسال إعلان
     if (state.action === 'await_broadcast_pin' && txt) {
         userStates[uId] = { action: 'admin_dashboard' };
         ctx.reply("🚀 جاري الإرسال...");
@@ -173,14 +162,14 @@ bot.on(['text', 'photo'], async (ctx) => {
         return;
     }
 
-    // ===== إرسال كود شحن =====
+    // إرسال كود شحن
     if (state.action === 'admin_send_code_now' && txt && state.clientUId) {
         bot.telegram.sendMessage(state.clientUId, `🎁 **كود الشحن:**\n\n\`${txt}\``, { parse_mode: 'Markdown' }).catch(() => {});
         userStates[uId] = null;
         return ctx.reply("✅ تم التسليم.");
     }
 
-    // ===== طلب بوت =====
+    // طلب بوت
     if (state.action === 'await_admin_price_time' && txt) return devBot.sendToAdminChannel(ctx, txt, uId, userStates, bot);
     if (state.action === 'await_bot_desc' && txt) return devBot.askContact(ctx, txt, uId, userStates);
     if (state.action === 'await_bot_contact' && txt) return devBot.askServer(ctx, txt, uId, userStates);
@@ -205,7 +194,7 @@ bot.on(['text', 'photo'], async (ctx) => {
         return;
     }
 
-    // ===== شحن رصيد سوري =====
+    // شحن رصيد سوري
     if (state.action === 'await_syr_phone' && txt) {
         userStates[uId] = { ...state, phoneNumber: txt, action: 'await_syr_amount' };
         return ctx.reply("💸 اكتب المبلغ:");
@@ -219,7 +208,7 @@ bot.on(['text', 'photo'], async (ctx) => {
         return ctx.reply(`🎯 تأكيد: ${syrAmount} ل.س = $${requiredUsdPrice.toFixed(2)}`, { ...Markup.inlineKeyboard([[Markup.button.callback("✔️ تأكيد", "confirm_order")]]) });
     }
 
-    // ===== استرجاع أموال =====
+    // استرجاع أموال
     if (state.action === 'await_refund_amount' && txt) {
         const amount = parseFloat(txt);
         if (isNaN(amount) || amount <= 0) return ctx.reply("❌ اكتب رقماً!");
@@ -234,14 +223,13 @@ bot.on(['text', 'photo'], async (ctx) => {
         return;
     }
 
-    // ===== معالجة خطوات الشحن =====
+    // معالجة خطوات الشحن
     if (state.action && (state.action.startsWith('await_charge') || state.action === 'await_proof')) {
         return charge.handleChargeSteps(ctx, state, uId, userStates, db);
     }
 });
 
-// ==================== تشغيل البوت ====================
-
+// ==================== التشغيل ====================
 bot.launch()
-    .then(() => console.log("🚀 تم تشغيل البوت بثبات تام..."))
+    .then(() => console.log("🚀 تم تشغيل البوت"))
     .catch((err) => console.error("❌ خطأ:", err));
