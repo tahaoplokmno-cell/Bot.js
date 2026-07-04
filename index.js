@@ -14,9 +14,9 @@ let db = dbFile.loadDB();
 let userStates = {};
 const saveDB = () => dbFile.saveDB(db);
 
-// ===== لوحة الأدمن =====
-const openPanel = (ctx) => {
-    const p = adminActions.getAdminPanel(db);
+// ===== لوحة الأدمن الخارقة =====
+const openSuperPanel = (ctx) => {
+    const p = adminActions.getSuperAdminPanel(db);
     return ctx.reply(p.text, { parse_mode: 'Markdown', ...p.markup });
 };
 
@@ -40,7 +40,7 @@ bot.command('admin', ctx => {
 bot.command('panel', ctx => {
     const uId = String(ctx.chat.id);
     if (userStates[uId]?.action === 'admin_dashboard' || uId === "8243108672") {
-        return openPanel(ctx);
+        return openSuperPanel(ctx);
     }
     ctx.reply("❌ ليس لديك صلاحية.");
 });
@@ -72,7 +72,7 @@ bot.hears('💰 استرجاع الأموال', ctx => {
     ctx.reply("✍️ اكتب المبلغ بالدولار:");
 });
 
-// ==================== الكولباك (معدل) ====================
+// ==================== الكولباك ====================
 bot.on('callback_query', async (ctx) => {
     try {
         await callbackHandler(ctx, bot, db, userStates, saveDB);
@@ -231,5 +231,5 @@ bot.on(['text', 'photo'], async (ctx) => {
 
 // ==================== التشغيل ====================
 bot.launch()
-    .then(() => console.log("🚀 تم تشغيل البوت"))
+    .then(() => console.log("🚀 تم تشغيل البوت الخارق"))
     .catch((err) => console.error("❌ خطأ:", err));
