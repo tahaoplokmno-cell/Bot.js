@@ -88,7 +88,7 @@ bot.on('callback_query', async (ctx) => {
 });
 
 // ==================== الرسائل النصية ====================
-bot.on(['text', 'photo'], async (ctx) => {
+bot.on(['text', 'photo', 'document'], async (ctx) => {
     const uId = String(ctx.chat.id);
     const state = userStates[uId];
     const txt = ctx.message.text;
@@ -281,34 +281,82 @@ bot.on(['text', 'photo'], async (ctx) => {
         return;
     }
 
-    // ===== 1️⃣3️⃣ طلب بوت: السعر والوقت =====
-    if (state.action === 'await_admin_price_time' && txt) {
+    // ===== 1️⃣3️⃣ طلب بوت: السعر =====
+    if (state.action === 'await_bot_price' && txt) {
         const clientId = state.targetCustomerId;
         if (clientId) {
-            await bot.telegram.sendMessage(clientId, `🎉 **تم قبول طلبك!**\n📝 السعر والوقت: ${txt}`).catch(() => {});
-            ctx.reply(`✅ تم إرسال السعر والوقت للمستخدم ${clientId}`);
+            await bot.telegram.sendMessage(clientId, `💰 **السعر:** ${txt}`).catch(() => {});
+            ctx.reply(`✅ تم إرسال السعر للمستخدم ${clientId}`);
         }
         userStates[uId] = null;
         return;
     }
 
-    // ===== 1️⃣4️⃣ طلب بوت: استقبال المواصفات =====
+    // ===== 1️⃣4️⃣ طلب بوت: وصف إضافي =====
+    if (state.action === 'await_bot_desc_admin' && txt) {
+        const clientId = state.targetCustomerId;
+        if (clientId) {
+            await bot.telegram.sendMessage(clientId, `📝 **وصف إضافي:** ${txt}`).catch(() => {});
+            ctx.reply(`✅ تم إرسال الوصف للمستخدم ${clientId}`);
+        }
+        userStates[uId] = null;
+        return;
+    }
+
+    // ===== 1️⃣5️⃣ طلب بوت: الوقت =====
+    if (state.action === 'await_bot_time' && txt) {
+        const clientId = state.targetCustomerId;
+        if (clientId) {
+            await bot.telegram.sendMessage(clientId, `⏰ **الوقت المتوقع:** ${txt}`).catch(() => {});
+            ctx.reply(`✅ تم إرسال الوقت للمستخدم ${clientId}`);
+        }
+        userStates[uId] = null;
+        return;
+    }
+
+    // ===== 1️⃣6️⃣ طلب بوت: إرسال ملف =====
+    if (state.action === 'await_bot_file' && (ctx.message.document || txt)) {
+        const clientId = state.targetCustomerId;
+        if (clientId) {
+            if (ctx.message.document) {
+                await bot.telegram.sendDocument(clientId, ctx.message.document.file_id, { caption: "📂 ملف البوت جاهز!" }).catch(() => {});
+            } else {
+                await bot.telegram.sendMessage(clientId, `📂 **الملف:** ${txt}`).catch(() => {});
+            }
+            ctx.reply(`✅ تم إرسال الملف للمستخدم ${clientId}`);
+        }
+        userStates[uId] = null;
+        return;
+    }
+
+    // ===== 1️⃣7️⃣ إرسال الكود للزبون =====
+    if (state.action === 'await_send_code' && txt) {
+        const clientId = state.clientUId;
+        if (clientId) {
+            await bot.telegram.sendMessage(clientId, `🎁 **كود الشحن:**\n\n\`${txt}\``, { parse_mode: 'Markdown' }).catch(() => {});
+            ctx.reply(`✅ تم إرسال الكود للمستخدم ${clientId}`);
+        }
+        userStates[uId] = null;
+        return;
+    }
+
+    // ===== 1️⃣8️⃣ طلب بوت: استقبال المواصفات =====
     if (state.action === 'await_bot_desc' && txt) {
         return devBot.askContact(ctx, txt, uId, userStates);
     }
 
-    // ===== 1️⃣5️⃣ طلب بوت: استقبال التواصل =====
+    // ===== 1️⃣9️⃣ طلب بوت: استقبال التواصل =====
     if (state.action === 'await_bot_contact' && txt) {
         return devBot.askServer(ctx, txt, uId, userStates);
     }
 
-    // ===== 1️⃣6️⃣ شحن رصيد سوري (رقم الهاتف) =====
+    // ===== 2️⃣0️⃣ شحن رصيد سوري (رقم الهاتف) =====
     if (state.action === 'await_syr_phone' && txt) {
         userStates[uId] = { ...state, phoneNumber: txt, action: 'await_syr_amount' };
         return ctx.reply("💸 اكتب المبلغ:");
     }
 
-    // ===== 1️⃣7️⃣ شحن رصيد سوري (المبلغ) =====
+    // ===== 2️⃣1️⃣ شحن رصيد سوري (المبلغ) =====
     if (state.action === 'await_syr_amount' && txt) {
         const syrAmount = parseFloat(txt);
         if (isNaN(syrAmount) || syrAmount <= 0) return ctx.reply("❌ اكتب رقماً!");
@@ -322,12 +370,12 @@ bot.on(['text', 'photo'], async (ctx) => {
         });
     }
 
-    // ===== 1️⃣8️⃣ معالجة الشحن =====
+    // ===== 2️⃣2️⃣ معالجة الشحن =====
     if (state.action && (state.action.startsWith('await_charge') || state.action === 'await_proof')) {
         return charge.handleChargeSteps(ctx, state, uId, userStates, db);
     }
 
-    // ===== 1️⃣9️⃣ أي رسالة غير معروفة =====
+    // ===== 2️⃣3️⃣ أي رسالة غير معروفة =====
     return ctx.reply("⚠️ لم أفهم طلبك. استخدم الأزرار من القائمة.");
 });
 
