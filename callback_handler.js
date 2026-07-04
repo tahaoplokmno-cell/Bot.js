@@ -117,11 +117,12 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         return ctx.reply(`✍️ اكتب رقم الهاتف (${type.toUpperCase()}):`);
     }
 
-    // ===== باقي الأزرار القديمة (شحن، إنشاء بوت، استرجاع) =====
+    // ===== إنشاء بوت =====
     if (data === "bot_order#start") {
         return devBot.initBotOrder(ctx, userStates, uId);
     }
 
+    // ===== الشحن =====
     if (data.startsWith("ch#")) {
         return charge.askAmount(ctx, data, uId, userStates);
     }
@@ -129,13 +130,15 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
     if (data.startsWith("amt#") || data.startsWith("amts#")) {
         const amount = data.split("#")[1];
         userStates[uId] = { action: 'await_charge_amount', amount: parseFloat(amount), isUsd: data.startsWith("amt#") };
-        return ctx.reply(`📸 أرسل صورة أو رمز العملية إثبات الدفع بقيمة ${amount} ${data.startsWith("amt#") ? '$' : 'ل.س'}`);
+        return ctx.reply(`📸 أرسل صورة إثبات الدفع بقيمة ${amount} ${data.startsWith("amt#") ? '$' : 'ل.س'}`);
     }
 
+    // ===== قبول/رفض الدفع =====
     if (data.startsWith("pay_approve#") || data.startsWith("pay_reject#")) {
         return adminActions.handlePaymentDecision(ctx, data, uId, db, saveDB);
     }
 
+    // ===== استرجاع الأموال =====
     if (data.startsWith("ref_app#") || data.startsWith("ref_rej#")) {
         const parts = data.split("#");
         const targetId = parts[1];
@@ -162,10 +165,12 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         return ctx.reply(msg);
     }
 
+    // ===== السيرفر (إنشاء بوت) =====
     if (data.startsWith("srv#")) {
         return devBot.handleServerChoice(ctx, data, uId, userStates, bot);
     }
 
+    // ===== أزرار طلب البوت (4 أزرار) =====
     if (data.startsWith("bot_dec#")) {
         const parts = data.split("#");
         const action = parts[1];
@@ -189,6 +194,7 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         }
     }
 
+    // ===== إرسال الكود للزبون =====
     if (data.startsWith("send_code#")) {
         const clientId = data.split("#")[1];
         userStates[uId] = { action: 'await_send_code', clientUId: clientId };
