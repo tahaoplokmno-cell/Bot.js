@@ -60,10 +60,8 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         userStates[uId] = null;
         const msg = `✅ **تم الشراء بنجاح!**\n🎁 المنتج: *${state.item}*\n💰 الخصم: *$${state.price}*\n🆔 الآيدي: \`${state.gameId || 'غير محدد'}\``;
         await ctx.editMessageText(msg, { parse_mode: 'Markdown' });
-        
-        // 🔔 إشعار صوتي للأدمن
         await bot.telegram.sendMessage(require('./config').ADMIN_CHANNEL_ID, 
-            `🛒 **طلب شراء جديد!**\n👤 ${ctx.from.first_name}\n🆔 \`${uId}\`\n🎁 ${state.item}\n💰 $${state.price}\n🔔 *رنين*`
+            `🛒 **طلب شراء جديد!**\n👤 ${ctx.from.first_name}\n🆔 \`${uId}\`\n🎁 ${state.item}\n💰 $${state.price}`
         ).catch(() => {});
         return;
     }
