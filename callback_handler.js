@@ -121,6 +121,5 @@ module.exports = async function handleCallback(ctx, bot, db, userStates, saveDB)
         });
     }
 
-    // ===== 1️⃣2️⃣ أي زر آخر =====
     return ctx.reply("⚠️ هذا الزر غير مفعل حالياً.");
 };
