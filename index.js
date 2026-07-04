@@ -62,7 +62,7 @@ bot.start(async (ctx) => {
 });
 
 // ==================== الأزرار النصية ====================
-bot.hears('🛒 المتجر', ctx => ctx.reply("🛍️ اختر القسم:", menus.storeMenu));
+bot.hears('🏪 المتجر', ctx => ctx.reply("🛍️ اختر القسم:", menus.storeMenu));
 bot.hears('💳 المحفظة', ctx => charge.initCharge(ctx, userStates, String(ctx.chat.id), db));
 bot.hears('🤖 إنشاء بوت', ctx => devBot.initBotOrder(ctx, userStates, String(ctx.chat.id)));
 bot.hears('⚙️ الإعدادات', ctx => settings.showSettings(ctx));
