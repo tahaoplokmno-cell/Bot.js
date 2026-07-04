@@ -37,6 +37,8 @@ function loadDB() {
         if (!data.exchange_rate) data.exchange_rate = 14500;
         if (!data.admin_notes) data.admin_notes = "";
         if (data.bot_maintenance === undefined) data.bot_maintenance = false;
+        
+        // ===== المتجر =====
         if (!data.custom_store) data.custom_store = { games: {} };
         
         // ===== الحقول الجديدة للوحة الخارقة =====
@@ -50,7 +52,7 @@ function loadDB() {
     } catch (e) {
         console.error("⚠️ حدث تلف في الملف الرئيسي، جاري محاولة القراءة من النسخة الاحتياطية لحماية الأموال...", e);
         
-        // 3. خط الدفاع الأخير: إذا تلف الـ JSON تماماً، نجبره على قراءة الباك اب ولا نرجع كائناً فارغاً يصفر الحسابات
+        // 3. خط الدفاع الأخير: إذا تلف الـ JSON تماماً، نجبره على قراءة الباك اب
         try {
             if (fs.existsSync(BACKUP_FILE)) {
                 let backupRaw = fs.readFileSync(BACKUP_FILE, 'utf8');
@@ -62,7 +64,7 @@ function loadDB() {
             console.error("❌ حتى النسخة الاحتياطية تالفة أو غير موجودة:", backupError);
         }
 
-        // إذا دمرت كل الملفات تماماً (حالة نادرة جداً)، نرجع البنية الأساسية مع الحقول الجديدة
+        // إذا دمرت كل الملفات تماماً، نرجع البنية الأساسية الكاملة
         return { 
             users: {}, 
             banned: {}, 
@@ -70,7 +72,15 @@ function loadDB() {
             exchange_rate: 14500,
             admin_notes: "",
             bot_maintenance: false,
-            custom_store: { games: {} },
+            custom_store: { 
+                games: {
+                    "🎮 ببجي موبايل": ["60 شدة - 1.00$", "325 شدة - 5.00$", "660 شدة - 10.00$", "1800 شدة - 25.00$"],
+                    "🎮 فري فاير": ["100 دايموند - 2.00$", "200 دايموند - 4.00$", "400 دايموند - 7.00$"],
+                    "🎮 روبلوكس": ["100 روبوكس - 1.50$", "500 روبوكس - 6.00$", "1000 روبوكس - 11.00$"],
+                    "🎮 بطاقات ستيم": ["فئة 5$ - 5.50$", "فئة 10$ - 11.00$"],
+                    "🎮 بطاقات إكس بوكس": ["فئة 10$ - 10.50$", "فئة 25$ - 26.00$"]
+                }
+            },
             orders: [],
             bot_orders: [],
             installments: [],
@@ -83,7 +93,7 @@ function saveDB(d) {
     try {
         if (!d || typeof d !== 'object' || !d.users) return;
         
-        // ===== التأكد من وجود جميع الحقول الجديدة قبل الحفظ =====
+        // ===== التأكد من وجود جميع الحقول قبل الحفظ =====
         if (!d.orders) d.orders = [];
         if (!d.bot_orders) d.bot_orders = [];
         if (!d.installments) d.installments = [];
@@ -103,3 +113,4 @@ function saveDB(d) {
 }
 
 module.exports = { loadDB, saveDB };
+
