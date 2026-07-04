@@ -72,7 +72,7 @@ bot.hears('💰 استرجاع الأموال', ctx => {
     ctx.reply("✍️ اكتب المبلغ بالدولار:");
 });
 
-// ==================== الكولباك ====================
+// ==================== الكولباك (معدل) ====================
 bot.on('callback_query', async (ctx) => {
     try {
         await callbackHandler(ctx, bot, db, userStates, saveDB);
