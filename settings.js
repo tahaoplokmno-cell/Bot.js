@@ -15,7 +15,7 @@ function showSupport(ctx) {
     let msg = `📞 <b>مركز الدعم الفني المباشر:</b>\n━━━━━━━━━━━━━━━━━━━━\nإذا واجهتك أي مشكلة في الشحن، أو تأخر تسليم كود ببجي، يرجى مراسلة الإدارة والمطور مباشرة عبر المعرف التالي:\n\n💬 الدعم الفني: <b>${devUser}</b>\n\n⏱️ متواجدون لخدمتكم وضمان أمان شحناتكم بأسرع وقت ممكن! ❤️`;
 
     const usernameClean = devUser.replace('@', '');
-    const finalUrl = `https://t.me/${usernameClean}`;  // ✅ تم الإصلاح
+    const finalUrl = `https://t.me/${usernameClean}`;
 
     const supportLinkBtn = Markup.inlineKeyboard([
         [Markup.button.url("💬 اضغط هنا لمراسلة الدعم فوراً", finalUrl)],
@@ -30,4 +30,4 @@ function showRefundPolicy(ctx) {
     ctx.reply(msg, { parse_mode: 'HTML', ...backBtn });
 }
 
-module.exports = { showSettings, showSupport, showRefundPolicy };j
+module.exports = { showSettings, showSupport, showRefundPolicy };
