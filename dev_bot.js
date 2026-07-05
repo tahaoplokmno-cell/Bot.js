@@ -26,7 +26,7 @@ function handleServerChoice(ctx, data, uId, userStates, bot) {
     const state = userStates[uId];
     if (!state) return ctx.reply("❌ انتهت الجلسة، أعد المحاولة.");
 
-    const srvName = srvType === 'strong' 
+    const srvName = srvType === 'strong'
         ? '🔥 قوي ومحمي 24 ساعة (5$/الشهر + أسبوع مجاناً)'
         : '💤 متوسط 12-18 ساعة (2$/الشهر)';
 
@@ -45,7 +45,7 @@ function handleServerChoice(ctx, data, uId, userStates, bot) {
         reply_markup: btn.reply_markup,
         parse_mode: 'Markdown'
     }).catch(() => {});
-    
+
     userStates[uId] = null;
 }
 
