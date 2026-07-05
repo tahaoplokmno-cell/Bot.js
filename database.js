@@ -3,7 +3,6 @@ const path = require('path');
 const DB_FILE = path.join(__dirname, 'database.json');
 const BACKUP_FILE = path.join(__dirname, 'database_backup.json');
 
-// ===== البيانات الافتراضية (بدون ألعاب، لأن الأزرار مباشرة) =====
 const DEFAULT_DATA = {
     users: {},
     banned: {},
@@ -12,7 +11,7 @@ const DEFAULT_DATA = {
     admin_notes: "",
     bot_maintenance: false,
     custom_store: {
-        games: {}  // 🔥 فاضي لأن الأزرار مباشرة وما بتحتاج كتالوج
+        games: {}
     },
     orders: [],
     bot_orders: [],
