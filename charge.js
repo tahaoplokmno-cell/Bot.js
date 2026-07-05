@@ -9,7 +9,7 @@ function initCharge(ctx, userStates, uId, db) {
     const usd = db.users[uId].balance_usd || 0;
 
     const btn = Markup.inlineKeyboard([
-        [Markup.button.callback("💵 شحن بالدولار", "ch#usd"), 
+        [Markup.button.callback("💵 شحن بالدولار", "ch#usd"),
          Markup.button.callback("🇸🇾 شحن بالليرة", "ch#syr")],
         [Markup.button.callback("🔙 العودة للقائمة", "main_menu")]
     ]);
@@ -22,9 +22,9 @@ function askAmount(ctx, data, uId, userStates) {
     const isUsd = data === "ch#usd";
     userStates[uId] = { action: 'await_charge_amount', isUsd };
     const code = isUsd ? config.MY_TRANSFER_CODE_USD : config.MY_TRANSFER_CODE_SYR;
-    
-    ctx.reply(`📌 **بيانات التحويل:**\n\`${code}\`\n━━━━━━━━━━━━━━━━━━━━\n✍️ اكتب المبلغ (أرقام فقط):`, { 
-        parse_mode: 'Markdown' 
+
+    ctx.reply(`📌 **بيانات التحويل:**\n\`${code}\`\n━━━━━━━━━━━━━━━━━━━━\n✍️ اكتب المبلغ (أرقام فقط):`, {
+        parse_mode: 'Markdown'
     });
 }
 
@@ -35,7 +35,7 @@ async function handleChargeSteps(ctx, state, uId, userStates, db) {
             return ctx.reply("❌ اكتب رقماً صحيحاً!");
         }
         userStates[uId] = { action: 'await_proof', amount, isUsd: state.isUsd };
-        return ctx.reply("📸 أرسل صورة إثبات الدفع:");
+        return ctx.reply("📸  أرسل صورة إثبات الدفع أو رقم العملية:");
     }
 
     if (state.action === 'await_proof') {
@@ -48,13 +48,13 @@ async function handleChargeSteps(ctx, state, uId, userStates, db) {
         ]);
 
         if (ctx.message.photo) {
-            await ctx.telegram.sendPhoto(config.ADMIN_CHANNEL_ID, 
-                ctx.message.photo.pop().file_id, 
+            await ctx.telegram.sendPhoto(config.ADMIN_CHANNEL_ID,
+                ctx.message.photo.pop().file_id,
                 { caption: cap, reply_markup: btn.reply_markup, parse_mode: 'Markdown' }
             );
         } else {
-            await ctx.telegram.sendMessage(config.ADMIN_CHANNEL_ID, 
-                cap + `\n📝 الإثبات: ${ctx.message.text}`, 
+            await ctx.telegram.sendMessage(config.ADMIN_CHANNEL_ID,
+                cap + `\n📝 الإثبات: ${ctx.message.text}`,
                 { reply_markup: btn.reply_markup, parse_mode: 'Markdown' }
             );
         }
