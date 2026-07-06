@@ -3,7 +3,6 @@ const path = require('path');
 const DB_FILE = path.join(__dirname, 'database.json');
 const BACKUP_FILE = path.join(__dirname, 'database_backup.json');
 
-// البيانات الافتراضية لجميع الألعاب والبطاقات
 const DEFAULT_DATA = {
     users: {},
     banned: {},
@@ -46,7 +45,6 @@ const DEFAULT_DATA = {
 };
 
 function loadDB() {
-    // استعادة النسخة الاحتياطية إذا لزم الأمر
     if (!fs.existsSync(DB_FILE) && fs.existsSync(BACKUP_FILE)) {
         try { fs.writeFileSync(DB_FILE, fs.readFileSync(BACKUP_FILE, 'utf8')); } catch (e) {}
     }
@@ -60,12 +58,10 @@ function loadDB() {
 
         let data = JSON.parse(raw);
 
-        // دمج البيانات المفقودة مع الافتراضيات
         for (let key in DEFAULT_DATA) {
             if (!data[key]) data[key] = DEFAULT_DATA[key];
         }
 
-        // تأمين قسم المتجر
         if (!data.custom_store) data.custom_store = { games: {} };
         if (Object.keys(data.custom_store.games).length === 0) {
             data.custom_store.games = DEFAULT_DATA.custom_store.games;
@@ -73,7 +69,6 @@ function loadDB() {
 
         return data;
     } catch (e) {
-        console.error("⚠️ تلف في الملف، جاري استخدام البيانات الافتراضية");
         return JSON.parse(JSON.stringify(DEFAULT_DATA));
     }
 }
@@ -82,7 +77,6 @@ function saveDB(d) {
     try {
         if (!d || typeof d !== 'object' || !d.users) return;
 
-        // تأكد من وجود الألعاب قبل الحفظ
         if (!d.custom_store) d.custom_store = { games: {} };
         if (Object.keys(d.custom_store.games).length === 0) {
             d.custom_store.games = DEFAULT_DATA.custom_store.games;
@@ -91,9 +85,7 @@ function saveDB(d) {
         const rawData = JSON.stringify(d, null, 4);
         fs.writeFileSync(DB_FILE, rawData, 'utf8');
         fs.writeFileSync(BACKUP_FILE, rawData, 'utf8');
-    } catch (e) {
-        console.error("❌ فشل حفظ قاعدة البيانات:", e);
-    }
+    } catch (e) {}
 }
 
 module.exports = { loadDB, saveDB };
